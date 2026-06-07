@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --color-bg: #0d1117;
+  --color-surface: #161b22;
+  --color-surface-2: #21262d;
+  --color-border: #30363d;
+  --color-text: #e6edf3;
+  --color-text-muted: #8b949e;
+  --color-accent: #2f81f7;
+  --color-accent-hover: #388bfd;
+  --color-success: #3fb950;
+  --color-warning: #d29922;
+  --color-error: #f85149;
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-color: var(--color-surface-2) transparent;
+  scrollbar-width: thin;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+::selection {
+  background: rgba(47, 129, 247, 0.3);
+}
+
+::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-2);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border);
+  background-clip: padding-box;
+}
+
+.panel-resize-handle {
+  background: transparent;
+  cursor: col-resize;
+  flex: 0 0 4px;
+  position: relative;
+  transition: background-color 150ms ease;
+  width: 4px;
+  z-index: 10;
+}
+
+.panel-resize-handle::after {
+  background: var(--color-border);
+  bottom: 0;
+  content: "";
+  left: 1px;
+  position: absolute;
+  top: 0;
+  width: 1px;
+}
+
+.panel-resize-handle:hover,
+.panel-resize-handle[data-resize-handle-active] {
+  background: rgba(47, 129, 247, 0.2);
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.cursor-blink {
+  animation: blink 1s step-end infinite;
+  color: var(--color-accent);
+  font-weight: 700;
+}

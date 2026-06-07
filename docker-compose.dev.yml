@@ -1,0 +1,96 @@
+name: codeflow-ai-dev
+
+services:
+  web:
+    image: node:22-alpine
+    working_dir: /workspace
+    command: corepack pnpm --filter @codeflow/web dev --hostname 0.0.0.0
+    env_file:
+      - path: .env.local
+        required: false
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    volumes:
+      - .:/workspace
+      - pnpm-store:/root/.local/share/pnpm/store
+      - root-node-modules:/workspace/node_modules
+    depends_on:
+      api:
+        condition: service_started
+
+  api:
+    image: node:22-alpine
+    working_dir: /workspace
+    command: corepack pnpm --filter @codeflow/api dev
+    env_file:
+      - path: .env.local
+        required: false
+    environment:
+      NODE_ENV: development
+      APP_PORT: 4000
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/codeflow_ai
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "${APP_PORT:-4000}:4000"
+      - "9229:9229"
+    volumes:
+      - .:/workspace
+      - pnpm-store:/root/.local/share/pnpm/store
+      - root-node-modules:/workspace/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: codeflow_ai
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U postgres -d codeflow_ai
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-dev-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles:
+      - ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-dev-data:/root/.ollama
+
+volumes:
+  pnpm-store:
+  root-node-modules:
+  postgres-dev-data:
+  redis-dev-data:
+  ollama-dev-data:
