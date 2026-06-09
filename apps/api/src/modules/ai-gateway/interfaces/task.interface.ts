@@ -1,0 +1,86 @@
+export enum TaskType {
+  CODE_GENERATION = 'code_generation',
+  REFACTOR = 'refactor',
+  QUICK_QUESTION = 'quick_question',
+  ARCHITECTURE = 'architecture',
+  DOCUMENTATION = 'documentation',
+  LARGE_CONTEXT = 'large_context',
+  CODE_REVIEW = 'code_review',
+  GENERAL = 'general',
+}
+
+export const TASK_PROVIDER_MAP: Record<TaskType, string[]> = {
+  [TaskType.CODE_GENERATION]: [
+    'groq',
+    'gemini',
+    'mistral',
+    'openrouter',
+    'puter',
+    'ollama',
+  ],
+  [TaskType.REFACTOR]: [
+    'gemini',
+    'groq',
+    'mistral',
+    'openrouter',
+    'puter',
+    'ollama',
+  ],
+  [TaskType.QUICK_QUESTION]: [
+    'groq',
+    'puter',
+    'gemini',
+    'mistral',
+    'openrouter',
+    'ollama',
+  ],
+  [TaskType.ARCHITECTURE]: [
+    'puter',
+    'gemini',
+    'openrouter',
+    'groq',
+    'mistral',
+    'ollama',
+  ],
+  [TaskType.DOCUMENTATION]: [
+    'gemini',
+    'mistral',
+    'groq',
+    'openrouter',
+    'puter',
+    'ollama',
+  ],
+  [TaskType.LARGE_CONTEXT]: [
+    'puter',
+    'gemini',
+    'openrouter',
+    'groq',
+    'mistral',
+    'ollama',
+  ],
+  [TaskType.CODE_REVIEW]: [
+    'groq',
+    'gemini',
+    'mistral',
+    'openrouter',
+    'puter',
+    'ollama',
+  ],
+  [TaskType.GENERAL]: [
+    'puter',
+    'groq',
+    'gemini',
+    'mistral',
+    'openrouter',
+    'ollama',
+  ],
+};
+
+export const GLOBAL_FALLBACK_CHAIN: string[] = [
+  'puter',
+  'groq',
+  'gemini',
+  'mistral',
+  'openrouter',
+  'ollama',
+];

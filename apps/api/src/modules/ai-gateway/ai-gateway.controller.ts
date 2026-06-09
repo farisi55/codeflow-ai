@@ -1,24 +1,41 @@
-import { Body, Controller, Post } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+  Res,
+} from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
 
-import { AIRequestDto } from './dto/ai-request.dto';
-import { AIResponseDto } from './dto/ai-response.dto';
-import { AiGatewayService } from './ai-gateway.service';
+import { AIGatewayService } from './ai-gateway.service';
+import { AIStreamDto } from './dto/ai-stream.dto';
 
-@ApiTags('ai')
 @Controller('ai')
-export class AiGatewayController {
-  constructor(private readonly aiGatewayService: AiGatewayService) {}
-
-  @Post('chat')
-  @ApiOperation({ summary: 'Complete an AI chat request' })
-  chat(@Body() request: AIRequestDto): Promise<AIResponseDto> {
-    return this.aiGatewayService.complete(request);
-  }
+export class AIGatewayController {
+  constructor(private readonly aiGateway: AIGatewayService) {}
 
   @Post('stream')
-  @ApiOperation({ summary: 'Stream an AI chat request' })
-  stream(@Body() request: AIRequestDto): AsyncIterable<string> {
-    return this.aiGatewayService.stream(request);
+  @HttpCode(200)
+  async streamChat(
+    @Body() dto: AIStreamDto,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      'X-Accel-Buffering': 'no',
+      Connection: 'keep-alive',
+      'Access-Control-Allow-Origin':
+        reply.request.headers.origin ?? '*',
+    });
+
+    await this.aiGateway.streamChat(dto, reply.raw);
+  }
+
+  @Get('providers')
+  getProviders(): Record<string, boolean> {
+    return this.aiGateway.getProviderStatuses();
   }
 }

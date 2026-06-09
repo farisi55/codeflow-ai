@@ -13,6 +13,8 @@
     "@monaco-editor/react": "^4.6.0",
     "@tanstack/react-query": "^5.62.16",
     "clsx": "^2.1.1",
+    "idb-keyval": "^6.2.1",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.468.0",
     "monaco-editor": "^0.52.0",
     "next": "15.3.3",

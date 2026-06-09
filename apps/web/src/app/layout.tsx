@@ -32,7 +32,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
       lang="en"
       suppressHydrationWarning
     >
-      <body>
+      <body suppressHydrationWarning>
         <ReactQueryProvider>{children}</ReactQueryProvider>
       </body>
     </html>

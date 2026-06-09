@@ -1,46 +1,77 @@
-import { ValidationPipe } from '@nestjs/common';
+import helmet from '@fastify/helmet';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import {
   FastifyAdapter,
   type NestFastifyApplication,
 } from '@nestjs/platform-fastify';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import helmet from '@fastify/helmet';
 
 import { AppModule } from './app.module';
+import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+
+interface HealthReply {
+  status(code: number): {
+    send(payload: { status: 'ok'; timestamp: string }): void;
+  };
+}
+
+type FastifyRegisterPlugin = Parameters<
+  NestFastifyApplication['register']
+>[0];
 
 async function bootstrap(): Promise<void> {
+  const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({
-      logger: process.env.NODE_ENV !== 'test',
-    }),
+    new FastifyAdapter({ logger: false }),
   );
+  const helmetPlugin = helmet as unknown as FastifyRegisterPlugin;
 
-  await app.register(helmet);
-  app.enableCors({
-    credentials: true,
-    origin: process.env.CORS_ORIGIN?.split(',') ?? true,
+  await app.register(helmetPlugin, {
+    contentSecurityPolicy: false,
   });
+
+  const corsOrigin = (
+    process.env.CORS_ORIGIN ??
+    'http://localhost:3000,http://127.0.0.1:3000'
+  )
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+  app.enableCors({
+    origin: corsOrigin,
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
-      forbidNonWhitelisted: true,
-      transform: true,
       whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: false,
     }),
   );
+  app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalInterceptors(new LoggingInterceptor());
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('CodeFlow AI API')
-    .setDescription('Backend API for the CodeFlow AI web IDE')
-    .setVersion('0.1.0')
-    .addBearerAuth()
-    .build();
-  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, swaggerDocument);
+  app.getHttpAdapter().get(
+    '/health',
+    (_request: unknown, reply: HealthReply) => {
+      void reply.status(200).send({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+      });
+    },
+  );
 
-  const port = Number(process.env.APP_PORT ?? 4000);
+  const port = parseInt(process.env.APP_PORT ?? '4000', 10);
   await app.listen(port, '0.0.0.0');
+
+  logger.log(`Backend running at http://localhost:${port}`);
+  logger.log(`Health check: http://localhost:${port}/health`);
+  logger.log(`AI Stream:    POST http://localhost:${port}/ai/stream`);
 }
 
 void bootstrap();

@@ -12,7 +12,6 @@ import {
 
 import { cn } from '@/lib/utils';
 import type { FileNode } from '@/mock/file-tree';
-import { useEditorStore } from '@/stores/editor.store';
 import { useExplorerStore } from '@/stores/explorer.store';
 
 interface FileTreeNodeProps {
@@ -40,8 +39,9 @@ export function FileTreeNode({ node, depth }: FileTreeNodeProps) {
   );
   const selectedNodeId = useExplorerStore((state) => state.selectedNodeId);
   const toggleFolder = useExplorerStore((state) => state.toggleFolder);
-  const selectNode = useExplorerStore((state) => state.selectNode);
-  const openFile = useEditorStore((state) => state.openFile);
+  const openFileInEditor = useExplorerStore(
+    (state) => state.openFileInEditor,
+  );
   const isFolder = node.type === 'folder';
   const isExpanded = isFolder && expandedFolderIds.includes(node.id);
   const isSelected = selectedNodeId === node.id;
@@ -52,8 +52,7 @@ export function FileTreeNode({ node, depth }: FileTreeNodeProps) {
       return;
     }
 
-    selectNode(node.id);
-    openFile(node);
+    void openFileInEditor(node.id);
   }
 
   return (

@@ -1,19 +1,94 @@
-import type {
-  AICompletionRequest,
-  AICompletionResponse,
-  AIStreamChunk,
-} from '@codeflow/shared';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
+import type { Readable } from 'node:stream';
 
-import { BaseProvider } from './base-provider';
+import type { ProviderMessage } from '../interfaces/provider.interface';
+import { BaseProvider } from './base.provider';
 
+interface OllamaChunk {
+  message?: {
+    content?: string;
+  };
+  done?: boolean;
+}
+
+@Injectable()
 export class OllamaProvider extends BaseProvider {
-  readonly name = 'ollama' as const;
+  readonly id = 'ollama';
+  readonly name = 'Ollama (Local)';
+  readonly models = [
+    'llama3.2',
+    'qwen2.5-coder',
+    'codellama',
+    'deepseek-coder-v2',
+  ];
 
-  complete(_request: AICompletionRequest): Promise<AICompletionResponse> {
-    return Promise.reject(new Error('Ollama provider is not implemented yet'));
+  private readonly baseUrl: string;
+
+  constructor(private readonly config: ConfigService) {
+    super();
+    this.baseUrl =
+      this.config.get<string>('providers.ollama.baseUrl') ??
+      'http://localhost:11434';
   }
 
-  async *stream(_request: AICompletionRequest): AsyncIterable<AIStreamChunk> {
-    throw new Error('Ollama provider streaming is not implemented yet');
+  isAvailable(): boolean {
+    return true;
+  }
+
+  protected getDefaultModel(): string {
+    return (
+      this.config.get<string>('providers.ollama.defaultModel') ??
+      'llama3.2'
+    );
+  }
+
+  async *stream(
+    messages: ProviderMessage[],
+    model: string,
+    signal?: AbortSignal,
+  ): AsyncGenerator<string, void, unknown> {
+    const response = await axios.post<Readable>(
+      `${this.baseUrl}/api/chat`,
+      {
+        model: this.resolveModel(model),
+        messages: messages.map((message) => ({
+          role: message.role,
+          content: message.content,
+        })),
+        stream: true,
+      },
+      {
+        responseType: 'stream',
+        signal,
+        timeout: 5000,
+      },
+    );
+
+    let buffer = '';
+    for await (const chunk of response.data) {
+      buffer += (chunk as Buffer).toString('utf-8');
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        if (!line.trim()) {
+          continue;
+        }
+
+        try {
+          const data = JSON.parse(line) as OllamaChunk;
+          if (data.message?.content) {
+            yield data.message.content;
+          }
+          if (data.done) {
+            return;
+          }
+        } catch {
+          this.logger.debug('Skipping malformed Ollama stream line');
+        }
+      }
+    }
   }
 }

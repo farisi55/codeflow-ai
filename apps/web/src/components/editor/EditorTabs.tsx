@@ -1,6 +1,6 @@
 'use client';
 
-import { X } from 'lucide-react';
+import { RefreshCw, X } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 
 import { cn } from '@/lib/utils';
@@ -11,6 +11,7 @@ export function EditorTabs() {
   const activeFileId = useEditorStore((state) => state.activeFileId);
   const setActiveFile = useEditorStore((state) => state.setActiveFile);
   const closeFile = useEditorStore((state) => state.closeFile);
+  const isSaving = useEditorStore((state) => state.isSaving);
 
   return (
     <div
@@ -21,7 +22,9 @@ export function EditorTabs() {
       {openFiles.map((file) => {
         const isActive = file.id === activeFileId;
 
-        function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+        function handleKeyDown(
+          event: KeyboardEvent<HTMLDivElement>,
+        ): void {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             setActiveFile(file.id);
@@ -43,9 +46,18 @@ export function EditorTabs() {
             tabIndex={0}
           >
             <span>{file.name}</span>
-            {file.isDirty ? (
-              <span aria-label="Unsaved changes" className="text-foreground">
-                •
+            {isSaving && isActive ? (
+              <RefreshCw
+                aria-label="Saving"
+                className="animate-spin text-muted"
+                size={10}
+              />
+            ) : file.isDirty ? (
+              <span
+                aria-label="Unsaved changes"
+                className="text-warning"
+              >
+                {'\u2022'}
               </span>
             ) : null}
             <button
