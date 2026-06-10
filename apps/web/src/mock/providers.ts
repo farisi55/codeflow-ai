@@ -9,8 +9,16 @@ export const MOCK_PROVIDERS: ProviderOption[] = [
   { id: 'auto', name: 'Auto', models: ['Auto'] },
   {
     id: 'puter',
-    name: 'Puter AI',
-    models: ['gpt-4o', 'claude-3-5-sonnet', 'gemini-2.0-flash'],
+    name: 'Puter AI (User-Pays)',
+    models: [
+      'gpt-5.4-nano',
+      'openai/gpt-5.4-nano',
+      'google/gemini-3.5-flash',
+      'google/gemini-3.1-pro-preview',
+      'gemini-2.5-flash-lite',
+      'claude-sonnet',
+      'meta-llama/llama-3.3-70b-instruct',
+    ],
   },
   {
     id: 'groq',

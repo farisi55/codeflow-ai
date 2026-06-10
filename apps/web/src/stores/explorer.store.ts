@@ -305,13 +305,25 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   },
 
   createFileInProject: async (filePath, content) => {
-    const { projectSource, rootHandle } = get();
+    const { projectSource, rootHandle, fileHandles } = get();
 
     if (projectSource !== 'fsa' || !rootHandle) {
       throw new Error(
         projectSource === 'zip'
           ? 'ZIP projects are read-only. Open a folder project to create files.'
           : 'No project is open. Open a folder first.',
+      );
+    }
+
+    const normalizedPath = filePath.toLowerCase();
+    if (
+      [...fileHandles.keys()].some(
+        (existingPath) =>
+          existingPath.toLowerCase() === normalizedPath,
+      )
+    ) {
+      throw new Error(
+        `File ${filePath} already exists. Ask the AI to update it instead.`,
       );
     }
 

@@ -23,13 +23,18 @@ import {
   getAutoApplyFileBlock,
   getLargestFileBlock,
 } from '@/lib/diff-utils';
-import { suggestFilename } from '@/lib/file-intent-utils';
+import {
+  detectCreateFileIntent,
+  suggestFilename,
+  validateFilename,
+} from '@/lib/file-intent-utils';
 import { useAIStore } from '@/stores/ai.store';
 import { useEditorStore } from '@/stores/editor.store';
 import { useExplorerStore } from '@/stores/explorer.store';
 import { useSettingsStore } from '@/stores/settings.store';
 
 import { ChatMessage } from './ChatMessage';
+import { PuterAuthBanner } from './PuterAuthBanner';
 
 interface Notification {
   type: 'success' | 'error';
@@ -49,6 +54,9 @@ export function AIChatPanel() {
   const isLoading = useAIStore((state) => state.isLoading);
   const sendMessage = useAIStore((state) => state.sendMessage);
   const clearMessages = useAIStore((state) => state.clearMessages);
+  const selectedProvider = useAIStore(
+    (state) => state.selectedProvider,
+  );
   const autoApply = useSettingsStore((state) => state.autoApply);
   const isSaving = useEditorStore((state) => state.isSaving);
   const [input, setInput] = useState('');
@@ -90,17 +98,23 @@ export function AIChatPanel() {
       return;
     }
 
-    const codeBlock = lastMessage.targetFile
-      ? getAutoApplyFileBlock(
+    const isCreateOperation =
+      lastMessage.fileOperation?.type === 'create';
+    const codeBlock = isCreateOperation
+      ? getAutoApplyFileBlock(lastMessage.content)
+      : lastMessage.targetFile
+        ? getAutoApplyFileBlock(
           lastMessage.content,
           lastMessage.targetFile.language,
         )
-      : getLargestFileBlock(lastMessage.content);
+        : getLargestFileBlock(lastMessage.content);
     if (!codeBlock) {
       appliedIds.current.add(lastMessage.id);
       setNotification({
         type: 'error',
-        message: lastMessage.targetFile
+        message: isCreateOperation
+          ? 'Auto-Apply skipped - AI did not return exactly one complete new file'
+          : lastMessage.targetFile
           ? `Auto-Apply skipped - AI did not return one complete ${lastMessage.targetFile.name} code block`
           : 'Auto-Apply skipped - AI did not return a complete file',
         canUndo: false,
@@ -123,6 +137,30 @@ export function AIChatPanel() {
             canUndo: false,
           });
           appliedIds.current.delete(lastMessage.id);
+          return;
+        }
+
+        if (isCreateOperation) {
+          const filename =
+            lastMessage.fileOperation?.path ??
+            suggestFilename(codeBlock.language);
+          const validationError = validateFilename(filename);
+          if (validationError) {
+            throw new Error(
+              `Auto-Apply skipped - invalid new file path: ${validationError}`,
+            );
+          }
+
+          undoSnapshot.current = null;
+          await explorerStore.createFileInProject(
+            filename,
+            codeBlock.code,
+          );
+          setNotification({
+            type: 'success',
+            message: `Created ${filename}`,
+            canUndo: false,
+          });
           return;
         }
 
@@ -325,8 +363,11 @@ export function AIChatPanel() {
         (file) => file.id === editorStore.activeFileId,
       ) ?? undefined;
 
+    const fileOperation = detectCreateFileIntent(input);
+
     void sendMessage(input, {
       autoApply,
+      fileOperation: fileOperation ?? undefined,
       activeFile: activeFile
         ? {
             id: activeFile.id,
@@ -372,6 +413,10 @@ export function AIChatPanel() {
           <Trash2 size={14} />
         </button>
       </div>
+
+      {selectedProvider === 'puter' || selectedProvider === 'auto' ? (
+        <PuterAuthBanner alwaysShow={selectedProvider === 'puter'} />
+      ) : null}
 
       {notification ? (
         <div

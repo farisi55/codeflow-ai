@@ -36,6 +36,15 @@ When the user asks to change, fix, refactor, add, remove, or implement something
 - You may add one short sentence outside the code block.
 The code block can be applied directly to the user's file, so it must contain only the final file content.`;
 
+const CREATE_FILE_PROMPT = `The user requested creation of a new file.
+- Return the complete contents of exactly one new file.
+- Put the complete file in exactly one fenced markdown code block.
+- Label the code block with the new file's language.
+- Do not rewrite or return the active reference file.
+- Do not provide alternatives, additional code blocks, or placeholders.
+- You may add one short sentence outside the code block.
+The code block can be created directly in the project, so it must contain only the final new file content.`;
+
 const PROVIDER_CATALOG_TTL_MS = 5 * 60 * 1000;
 
 @Injectable()
@@ -99,12 +108,16 @@ export class AIGatewayService {
       const baseSystemPrompt = skill
         ? skill.getSystemPrompt(dto.content)
         : DEFAULT_SYSTEM_PROMPT;
-      const systemPrompt = dto.activeFile
-        ? `${baseSystemPrompt}\n\n${ACTIVE_FILE_EDIT_PROMPT}`
-        : baseSystemPrompt;
-      const userContent = dto.activeFile
-        ? this.buildActiveFileRequest(dto)
-        : dto.content;
+      const isCreateOperation = dto.fileOperation?.type === 'create';
+      const systemPrompt = isCreateOperation
+        ? `${baseSystemPrompt}\n\n${CREATE_FILE_PROMPT}`
+        : dto.activeFile
+          ? `${baseSystemPrompt}\n\n${ACTIVE_FILE_EDIT_PROMPT}`
+          : baseSystemPrompt;
+      const userContent =
+        dto.activeFile || isCreateOperation
+          ? this.buildFileRequest(dto)
+          : dto.content;
       const messages: ProviderMessage[] = [
         { role: 'system', content: systemPrompt },
         ...dto.context.map((message) => ({
@@ -245,23 +258,32 @@ export class AIGatewayService {
     );
   }
 
-  private buildActiveFileRequest(dto: AIStreamDto): string {
+  private buildFileRequest(dto: AIStreamDto): string {
     const activeFile = dto.activeFile;
-    if (!activeFile) {
-      return dto.content;
-    }
 
     return [
       `User request: ${dto.content}`,
-      '',
-      `Active file path: ${activeFile.id}`,
-      `Active file name: ${activeFile.name}`,
-      `Active file language: ${activeFile.language}`,
-      `Auto-Apply mode: ${dto.autoApply ? 'enabled' : 'disabled'}`,
-      '',
-      '--- BEGIN ACTIVE FILE CONTENT ---',
-      activeFile.content,
-      '--- END ACTIVE FILE CONTENT ---',
+      ...(dto.fileOperation?.type === 'create'
+        ? [
+            'Requested operation: create new file',
+            `Requested new file path: ${
+              dto.fileOperation.path ?? 'infer from request'
+            }`,
+          ]
+        : []),
+      ...(activeFile
+        ? [
+            '',
+            `Active reference file path: ${activeFile.id}`,
+            `Active reference file name: ${activeFile.name}`,
+            `Active reference file language: ${activeFile.language}`,
+            `Auto-Apply mode: ${dto.autoApply ? 'enabled' : 'disabled'}`,
+            '',
+            '--- BEGIN ACTIVE REFERENCE FILE CONTENT ---',
+            activeFile.content,
+            '--- END ACTIVE REFERENCE FILE CONTENT ---',
+          ]
+        : []),
     ].join('\n');
   }
 }

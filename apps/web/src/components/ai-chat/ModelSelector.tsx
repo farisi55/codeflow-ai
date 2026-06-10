@@ -48,9 +48,12 @@ export function ModelSelector() {
   const refreshProviderCatalog = useAIStore(
     (state) => state.refreshProviderCatalog,
   );
-  const liveProvider = providerCatalog.find(
-    (provider) => provider.id === selectedProvider,
-  );
+  const liveProvider =
+    selectedProvider === 'puter'
+      ? undefined
+      : providerCatalog.find(
+          (provider) => provider.id === selectedProvider,
+        );
   const fallbackProvider =
     MOCK_PROVIDERS.find((candidate) => candidate.id === selectedProvider) ??
     MOCK_PROVIDERS[0];

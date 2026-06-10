@@ -47,10 +47,112 @@ const LANGUAGE_TO_FILENAME: Record<string, string> = {
 const WINDOWS_RESERVED_NAME =
   /^(CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(\.|$)/i;
 const ALLOWED_EXTENSIONLESS_FILENAMES = new Set(['dockerfile']);
+const EXPLICIT_FILE_PATTERN =
+  /(?:^|[\s"'`(])((?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.[A-Za-z0-9]+)(?=$|[\s"'`),;:])/g;
+const DIRECT_CREATE_TARGET_PATTERN =
+  /\b(?:create|make|generate|buat|bikin|ciptakan|add|tambah|tambahkan)\b[\s:,-]*(?:(?:a|an|sebuah|new|baru|file|berkas)\s+){0,4}["'`]?((?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.[A-Za-z0-9]+)/i;
+
+export interface CreateFileIntent {
+  type: 'create';
+  path?: string;
+}
+
+const LANGUAGE_KEYWORDS: Array<{
+  pattern: RegExp;
+  language: string;
+}> = [
+  { pattern: /\b(stylesheet|css)\b/i, language: 'css' },
+  { pattern: /\bhtml?\b/i, language: 'html' },
+  { pattern: /\btypescript|\.ts\b/i, language: 'typescript' },
+  { pattern: /\bjavascript|\.js\b/i, language: 'javascript' },
+  { pattern: /\btsx|react component\b/i, language: 'tsx' },
+  { pattern: /\bjsx\b/i, language: 'jsx' },
+  { pattern: /\bpython|\.py\b/i, language: 'python' },
+  { pattern: /\bjson\b/i, language: 'json' },
+  { pattern: /\bmarkdown|readme\b/i, language: 'markdown' },
+  { pattern: /\bsql\b/i, language: 'sql' },
+  { pattern: /\byaml|yml\b/i, language: 'yaml' },
+];
 
 export function suggestFilename(codeLanguage: string): string {
   const normalized = codeLanguage.toLowerCase().trim();
   return LANGUAGE_TO_FILENAME[normalized] ?? 'untitled.txt';
+}
+
+export function detectCreateFileIntent(
+  prompt: string,
+): CreateFileIntent | null {
+  const explicitPaths = [...prompt.matchAll(EXPLICIT_FILE_PATTERN)]
+    .map((match) => match[1])
+    .filter((candidate): candidate is string => Boolean(candidate));
+  const directTargetPath =
+    prompt.match(DIRECT_CREATE_TARGET_PATTERN)?.[1];
+  const hasDirectCreateAction =
+    /\b(create|make|generate|buat|bikin|ciptakan)\b/i.test(prompt);
+  const mentionsFile = /\b(file|berkas)\b/i.test(prompt);
+  const mentionsNewFile =
+    /\b(new|baru)\b[\s\S]{0,30}\b(file|berkas)\b|\b(file|berkas)\b[\s\S]{0,30}\b(new|baru)\b/i.test(
+      prompt,
+    );
+  const hasAddNewFileAction =
+    /\b(add|tambah|tambahkan)\b[\s\S]{0,40}\b(file|berkas)\b/i.test(
+      prompt,
+    ) && Boolean(directTargetPath || explicitPaths.length || mentionsNewFile);
+
+  if (
+    !(
+      (hasDirectCreateAction &&
+        (mentionsFile || directTargetPath || explicitPaths.length > 0)) ||
+      hasAddNewFileAction ||
+      mentionsNewFile
+    )
+  ) {
+    return null;
+  }
+
+  if (
+    directTargetPath &&
+    validateFilename(directTargetPath) === null
+  ) {
+    return { type: 'create', path: directTargetPath };
+  }
+
+  const language = LANGUAGE_KEYWORDS.find(({ pattern }) =>
+    pattern.test(prompt),
+  )?.language;
+  const suggestedPath = language
+    ? suggestFilename(language)
+    : undefined;
+  const suggestedExtension = suggestedPath
+    ?.split('.')
+    .at(-1)
+    ?.toLowerCase();
+  const matchingExplicitPath = suggestedExtension
+    ? explicitPaths.find(
+        (path) =>
+          path.split('.').at(-1)?.toLowerCase() ===
+          suggestedExtension,
+      )
+    : undefined;
+
+  if (
+    matchingExplicitPath &&
+    validateFilename(matchingExplicitPath) === null
+  ) {
+    return { type: 'create', path: matchingExplicitPath };
+  }
+
+  if (!language && explicitPaths.length === 1) {
+    const [explicitPath] = explicitPaths;
+    if (explicitPath && validateFilename(explicitPath) === null) {
+      return { type: 'create', path: explicitPath };
+    }
+  }
+
+  return {
+    type: 'create',
+    path: suggestedPath,
+  };
 }
 
 export function validateFilename(filename: string): string | null {

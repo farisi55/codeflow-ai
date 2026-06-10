@@ -1,15 +1,18 @@
 import { create } from 'zustand';
 
 import { apiClient, parseSSELine } from '@/lib/api-client';
+import { puterClient } from '@/lib/puter-client';
 import { MOCK_AI_RESPONSES } from '@/mock/ai-responses';
 import type {
   AIActiveFileContext,
+  AIFileOperation,
   AIStreamChunk,
   ProviderCatalogEntry,
 } from '@/types/api.types';
 
 export interface SendMessageOptions {
   activeFile?: AIActiveFileContext;
+  fileOperation?: AIFileOperation;
   autoApply?: boolean;
 }
 
@@ -23,6 +26,7 @@ export interface ChatMessage {
   resolvedModel?: string;
   autoApplyRequested?: boolean;
   targetFile?: AIActiveFileContext;
+  fileOperation?: AIFileOperation;
   isMockResponse?: boolean;
 }
 
@@ -48,6 +52,29 @@ interface AIState {
   clearMessages: () => void;
 }
 
+const PUTER_SYSTEM_PROMPT = `You are an expert AI coding assistant integrated into CodeFlow AI.
+Help developers write, review, refactor, and understand code.
+Provide clear, concise, accurate responses.
+When providing code, always use markdown code blocks with the language specified.
+Keep responses focused and practical.`;
+
+const PUTER_ACTIVE_FILE_PROMPT = `An active editor file is included with the user's request.
+When the user asks to change, fix, refactor, add, remove, or implement something in that file:
+- Return the complete updated file, including all unchanged sections.
+- Put the complete file in exactly one fenced markdown code block.
+- Label the code block with the file's language.
+- Do not provide alternatives or additional code blocks.
+- Do not omit unchanged code or use placeholders.
+The code block must contain only the final file content.`;
+
+const PUTER_CREATE_FILE_PROMPT = `The user requested creation of a new file.
+- Return the complete contents of exactly one new file.
+- Put the complete file in exactly one fenced markdown code block.
+- Label the code block with the new file's language.
+- Do not rewrite or return the active reference file.
+- Do not provide alternatives, additional code blocks, or placeholders.
+The code block must contain only the final new file content.`;
+
 let activeOperationId: string | null = null;
 let activeMockInterval: number | null = null;
 let resolveMockStream: (() => void) | null = null;
@@ -59,6 +86,58 @@ function stopMockStream(): void {
   }
   resolveMockStream?.();
   resolveMockStream = null;
+}
+
+function buildPuterMessages(
+  content: string,
+  context: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+  }>,
+  options: SendMessageOptions,
+): PuterAIMessage[] {
+  const activeFile = options.activeFile;
+  const createOperation = options.fileOperation?.type === 'create';
+  const systemPrompt = createOperation
+    ? `${PUTER_SYSTEM_PROMPT}\n\n${PUTER_CREATE_FILE_PROMPT}`
+    : activeFile
+      ? `${PUTER_SYSTEM_PROMPT}\n\n${PUTER_ACTIVE_FILE_PROMPT}`
+      : PUTER_SYSTEM_PROMPT;
+  const userContent =
+    activeFile || createOperation
+      ? [
+          `User request: ${content}`,
+          ...(createOperation
+            ? [
+                `Requested operation: create new file`,
+                `Requested new file path: ${
+                  options.fileOperation?.path ?? 'infer from request'
+                }`,
+              ]
+            : []),
+          ...(activeFile
+            ? [
+                '',
+                `Active reference file path: ${activeFile.id}`,
+                `Active reference file name: ${activeFile.name}`,
+                `Active reference file language: ${activeFile.language}`,
+                `Auto-Apply mode: ${
+                  options.autoApply ? 'enabled' : 'disabled'
+                }`,
+                '',
+                '--- BEGIN ACTIVE REFERENCE FILE CONTENT ---',
+                activeFile.content,
+                '--- END ACTIVE REFERENCE FILE CONTENT ---',
+              ]
+            : []),
+        ].join('\n')
+      : content;
+
+  return [
+    { role: 'system', content: systemPrompt },
+    ...context,
+    { role: 'user', content: userContent },
+  ];
 }
 
 export const useAIStore = create<AIState>((set, get) => ({
@@ -118,6 +197,7 @@ export const useAIStore = create<AIState>((set, get) => ({
       isStreaming: true,
       autoApplyRequested: options.autoApply === true,
       targetFile: options.activeFile,
+      fileOperation: options.fileOperation,
     };
     const operationId = assistantMessage.id;
     const context = initialState.messages.slice(-6).map((message) => ({
@@ -134,11 +214,90 @@ export const useAIStore = create<AIState>((set, get) => ({
       isLoading: true,
     }));
 
+    const shouldUsePuter =
+      (selectedProvider === 'puter' || selectedProvider === 'auto') &&
+      puterClient.isLoaded() &&
+      puterClient.isSignedIn();
+
+    if (shouldUsePuter) {
+      const resolvedModel =
+        selectedModel !== 'Auto' && selectedModel !== 'auto'
+          ? selectedModel
+          : 'gpt-5.4-nano';
+
+      try {
+        let receivedContent = false;
+        const puterMessages = buildPuterMessages(
+          trimmedContent,
+          context,
+          options,
+        );
+
+        for await (const token of puterClient.streamChat(
+          puterMessages,
+          resolvedModel,
+        )) {
+          if (activeOperationId !== operationId) {
+            return;
+          }
+          receivedContent = true;
+          set((state) => ({
+            messages: state.messages.map((message) =>
+              message.id === assistantMessage.id
+                ? {
+                    ...message,
+                    content: message.content + token,
+                  }
+                : message,
+            ),
+          }));
+        }
+
+        if (!receivedContent) {
+          throw new Error('Puter returned an empty stream');
+        }
+
+        activeOperationId = null;
+        set((state) => ({
+          messages: state.messages.map((message) =>
+            message.id === assistantMessage.id
+              ? {
+                  ...message,
+                  isStreaming: false,
+                  resolvedProvider: 'puter',
+                  resolvedModel,
+                }
+              : message,
+          ),
+          isLoading: false,
+        }));
+        return;
+      } catch (error) {
+        if (activeOperationId !== operationId) {
+          return;
+        }
+
+        const message =
+          error instanceof Error ? error.message : String(error);
+        console.warn(
+          `[Puter] Direct call failed, falling through to backend: ${message}`,
+        );
+        set((state) => ({
+          messages: state.messages.map((chatMessage) =>
+            chatMessage.id === assistantMessage.id
+              ? { ...chatMessage, content: '' }
+              : chatMessage,
+          ),
+        }));
+      }
+    }
+
     const stream = await apiClient.streamChat({
       content: trimmedContent,
       provider: selectedProvider,
       model: selectedModel === 'Auto' ? 'auto' : selectedModel,
       activeFile: options.activeFile,
+      fileOperation: options.fileOperation,
       autoApply: options.autoApply,
       context,
     });

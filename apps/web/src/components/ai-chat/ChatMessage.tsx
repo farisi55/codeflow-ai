@@ -28,11 +28,13 @@ interface ChatMessageProps {
 interface CreateFileButtonProps {
   code: string;
   language: string;
+  suggestedPath?: string;
 }
 
 function CreateFileButton({
   code,
   language,
+  suggestedPath,
 }: CreateFileButtonProps) {
   const [showInput, setShowInput] = useState(false);
   const [filename, setFilename] = useState('');
@@ -54,7 +56,7 @@ function CreateFileButton({
       return;
     }
 
-    setFilename(suggestFilename(language));
+    setFilename(suggestedPath ?? suggestFilename(language));
     setShowInput(true);
     setError(null);
     requestAnimationFrame(() => {
@@ -227,6 +229,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
       : null;
   const activeFile =
     openFiles.find((file) => file.id === activeFileId) ?? null;
+  const isCreateOperation = message.fileOperation?.type === 'create';
 
   function handleApplyToFile(): void {
     if (!codeBlock || !activeFile || activeFile.isReadOnly) {
@@ -266,7 +269,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
       {codeBlock ? (
         <div className="mt-2 flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            {activeFile ? (
+            {isCreateOperation ? (
+              <span className="text-[11px] text-muted">
+                New file: {message.fileOperation?.path ?? 'auto-detect'}
+              </span>
+            ) : activeFile ? (
               <button
                 className="flex items-center gap-1.5 rounded border border-accent bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-accent transition-colors hover:bg-[rgba(47,129,247,0.15)] disabled:cursor-not-allowed disabled:border-border disabled:text-muted"
                 disabled={activeFile.isReadOnly}
@@ -287,6 +294,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             <CreateFileButton
               code={codeBlock.code}
               language={codeBlock.language}
+              suggestedPath={message.fileOperation?.path}
             />
 
             <span className="ml-auto text-[11px] text-muted">

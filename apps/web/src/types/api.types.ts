@@ -5,6 +5,11 @@ export interface AIActiveFileContext {
   content: string;
 }
 
+export interface AIFileOperation {
+  type: 'create';
+  path?: string;
+}
+
 export interface ProviderModelInfo {
   id: string;
   name: string;
@@ -29,6 +34,7 @@ export interface AIStreamRequest {
   provider: string;
   model: string;
   activeFile?: AIActiveFileContext;
+  fileOperation?: AIFileOperation;
   autoApply?: boolean;
   context: Array<{
     role: 'user' | 'assistant';

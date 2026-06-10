@@ -30,6 +30,15 @@ export class ActiveFileContextDto {
   content!: string;
 }
 
+export class FileOperationDto {
+  @IsIn(['create'])
+  type!: 'create';
+
+  @IsString()
+  @IsOptional()
+  path?: string;
+}
+
 export class AIStreamDto {
   @IsString()
   content!: string;
@@ -44,6 +53,11 @@ export class AIStreamDto {
   @Type(() => ActiveFileContextDto)
   @IsOptional()
   activeFile?: ActiveFileContextDto;
+
+  @ValidateNested()
+  @Type(() => FileOperationDto)
+  @IsOptional()
+  fileOperation?: FileOperationDto;
 
   @IsBoolean()
   @IsOptional()
