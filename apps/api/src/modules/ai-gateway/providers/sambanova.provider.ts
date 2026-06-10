@@ -7,13 +7,14 @@ import type { ProviderMessage } from '../interfaces/provider.interface';
 import { BaseProvider } from './base.provider';
 
 @Injectable()
-export class MistralProvider extends BaseProvider {
-  readonly id = 'mistral';
-  readonly name = 'Mistral';
+export class SambaNovaProvider extends BaseProvider {
+  readonly id = 'sambanova';
+  readonly name = 'SambaNova';
   readonly models = [
-    'mistral-large-latest',
-    'codestral-latest',
-    'mistral-small-latest',
+    'Meta-Llama-3.3-70B-Instruct',
+    'DeepSeek-V3.1',
+    'MiniMax-M2.7',
+    'gpt-oss-120b',
   ];
 
   private readonly apiKey: string;
@@ -22,10 +23,10 @@ export class MistralProvider extends BaseProvider {
   constructor(private readonly config: ConfigService) {
     super();
     this.apiKey =
-      this.config.get<string>('providers.mistral.apiKey') ?? '';
+      this.config.get<string>('providers.sambanova.apiKey') ?? '';
     this.baseUrl =
-      this.config.get<string>('providers.mistral.baseUrl') ??
-      'https://api.mistral.ai/v1';
+      this.config.get<string>('providers.sambanova.baseUrl') ??
+      'https://api.sambanova.ai/v1';
   }
 
   isAvailable(): boolean {
@@ -34,8 +35,8 @@ export class MistralProvider extends BaseProvider {
 
   getDefaultModel(): string {
     return (
-      this.config.get<string>('providers.mistral.defaultModel') ??
-      'mistral-large-latest'
+      this.config.get<string>('providers.sambanova.defaultModel') ??
+      'Meta-Llama-3.3-70B-Instruct'
     );
   }
 
@@ -73,6 +74,11 @@ export class MistralProvider extends BaseProvider {
           yield content;
         }
       }
+    }
+
+    const content = this.parseOpenAIStreamLine(buffer.trim());
+    if (content) {
+      yield content;
     }
   }
 }

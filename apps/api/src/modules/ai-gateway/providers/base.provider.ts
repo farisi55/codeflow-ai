@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 
 import type {
   IProvider,
+  ProviderModel,
   ProviderMessage,
 } from '../interfaces/provider.interface';
 
@@ -11,12 +12,26 @@ export abstract class BaseProvider implements IProvider {
   abstract readonly id: string;
   abstract readonly name: string;
   abstract readonly models: string[];
+  readonly supportsDynamicModels: boolean = false;
 
   constructor() {
     this.logger = new Logger(this.constructor.name);
   }
 
   abstract isAvailable(): boolean;
+
+  abstract getDefaultModel(): string;
+
+  getFallbackModels(): string[] {
+    return [...new Set([this.getDefaultModel(), ...this.models])].slice(
+      0,
+      3,
+    );
+  }
+
+  async listModels(): Promise<ProviderModel[]> {
+    return this.models.map((id) => ({ id, name: id }));
+  }
 
   abstract stream(
     messages: ProviderMessage[],
@@ -27,8 +42,6 @@ export abstract class BaseProvider implements IProvider {
   protected resolveModel(model: string): string {
     return model && model !== 'auto' ? model : this.getDefaultModel();
   }
-
-  protected abstract getDefaultModel(): string;
 
   protected parseOpenAIStreamLine(line: string): string | null {
     if (!line.startsWith('data: ')) {

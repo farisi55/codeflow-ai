@@ -44,6 +44,38 @@ export function getLargestFileBlock(
   );
 }
 
+export function getAutoApplyFileBlock(
+  markdown: string,
+  targetLanguage?: string,
+): CodeBlock | null {
+  const blocks = extractCodeBlocks(markdown).filter(
+    (block) => block.code.trim().length > 0,
+  );
+
+  if (blocks.length === 0) {
+    return null;
+  }
+
+  if (targetLanguage) {
+    const normalizedTarget = toMonacoLanguage(targetLanguage);
+    const matchingBlocks = blocks.filter(
+      (block) =>
+        block.language !== 'plaintext' &&
+        toMonacoLanguage(block.language) === normalizedTarget,
+    );
+
+    if (matchingBlocks.length === 1) {
+      return matchingBlocks[0] ?? null;
+    }
+
+    if (matchingBlocks.length > 1) {
+      return null;
+    }
+  }
+
+  return blocks.length === 1 ? (blocks[0] ?? null) : null;
+}
+
 export function toMonacoLanguage(language: string): string {
   const languageMap: Record<string, string> = {
     ts: 'typescript',

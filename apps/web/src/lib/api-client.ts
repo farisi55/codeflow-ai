@@ -2,6 +2,7 @@ import type {
   AIStreamChunk,
   AIStreamRequest,
   HealthResponse,
+  ProviderCatalogEntry,
 } from '@/types/api.types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
@@ -48,6 +49,31 @@ export const apiClient = {
       }
 
       return response.body;
+    } catch {
+      return null;
+    }
+  },
+
+  async getProviderCatalog(
+    forceRefresh = false,
+  ): Promise<ProviderCatalogEntry[] | null> {
+    if (!API_URL) {
+      return null;
+    }
+
+    try {
+      const query = forceRefresh ? '?refresh=true' : '';
+      const response = await fetch(
+        `${API_URL}/ai/providers/catalog${query}`,
+        {
+          signal: AbortSignal.timeout(20000),
+        },
+      );
+      if (!response.ok) {
+        return null;
+      }
+
+      return (await response.json()) as ProviderCatalogEntry[];
     } catch {
       return null;
     }

@@ -4,28 +4,46 @@ export const providersConfig = registerAs('providers', () => ({
   puter: {
     apiKey: process.env.PUTER_API_KEY ?? '',
     baseUrl: 'https://api.puter.com',
-    defaultModel: 'gpt-4o',
+    defaultModel: process.env.PUTER_DEFAULT_MODEL ?? 'gpt-4o',
   },
   groq: {
     apiKey: process.env.GROQ_API_KEY ?? '',
     baseUrl: 'https://api.groq.com/openai/v1',
-    defaultModel: 'llama-3.3-70b-versatile',
+    defaultModel:
+      process.env.GROQ_DEFAULT_MODEL ?? 'llama-3.3-70b-versatile',
   },
   gemini: {
     apiKey: process.env.GEMINI_API_KEY ?? '',
-    defaultModel: 'gemini-2.0-flash',
+    defaultModel:
+      process.env.GEMINI_DEFAULT_MODEL ?? 'gemini-2.0-flash',
   },
   mistral: {
     apiKey: process.env.MISTRAL_API_KEY ?? '',
     baseUrl: 'https://api.mistral.ai/v1',
-    defaultModel: 'mistral-large-latest',
+    defaultModel:
+      process.env.MISTRAL_DEFAULT_MODEL ?? 'mistral-large-latest',
   },
   openrouter: {
     apiKey: process.env.OPENROUTER_API_KEY ?? '',
     baseUrl: 'https://openrouter.ai/api/v1',
-    defaultModel: 'auto',
+    defaultModel:
+      process.env.OPENROUTER_DEFAULT_MODEL ?? 'openrouter/free',
     siteUrl: 'http://localhost:3000',
     siteName: 'CodeFlow AI',
+  },
+  sambanova: {
+    apiKey: process.env.SAMBANOVA_API_KEY ?? '',
+    baseUrl:
+      process.env.SAMBANOVA_BASE_URL ?? 'https://api.sambanova.ai/v1',
+    defaultModel:
+      process.env.SAMBANOVA_DEFAULT_MODEL ??
+      'Meta-Llama-3.3-70B-Instruct',
+  },
+  zai: {
+    apiKey: process.env.ZAI_API_KEY ?? '',
+    baseUrl:
+      process.env.ZAI_BASE_URL ?? 'https://api.z.ai/api/paas/v4',
+    defaultModel: process.env.ZAI_DEFAULT_MODEL ?? 'glm-5.1',
   },
   ollama: {
     baseUrl: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434',

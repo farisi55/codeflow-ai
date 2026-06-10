@@ -31,7 +31,7 @@ export class PuterProvider extends BaseProvider {
     return this.apiKey.length > 0;
   }
 
-  protected getDefaultModel(): string {
+  getDefaultModel(): string {
     return (
       this.config.get<string>('providers.puter.defaultModel') ?? 'gpt-4o'
     );

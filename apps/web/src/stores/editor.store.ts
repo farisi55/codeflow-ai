@@ -18,6 +18,7 @@ interface EditorState {
   closeAllFiles: () => void;
   setActiveFile: (id: string) => void;
   updateContent: (id: string, content: string) => void;
+  saveFile: (id: string) => Promise<void>;
   saveActiveFile: () => Promise<void>;
   markClean: (id: string) => void;
 }
@@ -101,19 +102,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
 
-  saveActiveFile: async () => {
-    const { activeFileId, openFiles } = get();
-    if (!activeFileId) {
-      return;
-    }
-
-    const file = openFiles.find(
-      (openFile) => openFile.id === activeFileId,
-    );
+  saveFile: async (id) => {
+    const file = get().openFiles.find((openFile) => openFile.id === id);
     if (!file || !file.isDirty || file.isReadOnly) {
       return;
     }
 
+    const contentToSave = file.content;
     set({ isSaving: true });
     try {
       const { useExplorerStore } = await import(
@@ -121,12 +116,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       );
       await useExplorerStore
         .getState()
-        .saveFileContent(activeFileId, file.content);
-      get().markClean(activeFileId);
+        .saveFileContent(id, contentToSave);
+      set((state) => ({
+        openFiles: state.openFiles.map((openFile) =>
+          openFile.id === id && openFile.content === contentToSave
+            ? { ...openFile, isDirty: false }
+            : openFile,
+        ),
+      }));
     } catch {
       // Explorer store exposes the save error while the tab stays dirty.
     } finally {
       set({ isSaving: false });
+    }
+  },
+
+  saveActiveFile: async () => {
+    const { activeFileId } = get();
+    if (activeFileId) {
+      await get().saveFile(activeFileId);
     }
   },
 }));

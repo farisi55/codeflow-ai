@@ -26,7 +26,7 @@ export class GeminiProvider extends BaseProvider {
     return this.apiKey.length > 0;
   }
 
-  protected getDefaultModel(): string {
+  getDefaultModel(): string {
     return (
       this.config.get<string>('providers.gemini.defaultModel') ??
       'gemini-2.0-flash'

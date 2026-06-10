@@ -39,6 +39,10 @@ interface ExplorerState {
   restoreLastProject: () => Promise<void>;
   openFileInEditor: (nodeId: string) => Promise<void>;
   saveFileContent: (nodeId: string, content: string) => Promise<void>;
+  createFileInProject: (
+    filePath: string,
+    content: string,
+  ) => Promise<void>;
   toggleFolder: (id: string) => void;
   selectNode: (id: string) => void;
   clearError: () => void;
@@ -298,6 +302,35 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
       set({ error: message });
       throw error;
     }
+  },
+
+  createFileInProject: async (filePath, content) => {
+    const { projectSource, rootHandle } = get();
+
+    if (projectSource !== 'fsa' || !rootHandle) {
+      throw new Error(
+        projectSource === 'zip'
+          ? 'ZIP projects are read-only. Open a folder project to create files.'
+          : 'No project is open. Open a folder first.',
+      );
+    }
+
+    await fsaAdapter.createFile(rootHandle, filePath, content);
+    await get().refreshTree();
+
+    if (!get().fileHandles.has(filePath)) {
+      throw new Error(
+        `Created ${filePath}, but the refreshed file tree could not find it.`,
+      );
+    }
+
+    const { useEditorStore } = await import('@/stores/editor.store');
+    const editorStore = useEditorStore.getState();
+    if (editorStore.openFiles.some((file) => file.id === filePath)) {
+      editorStore.closeFile(filePath);
+    }
+
+    await get().openFileInEditor(filePath);
   },
 
   toggleFolder: (id) => {

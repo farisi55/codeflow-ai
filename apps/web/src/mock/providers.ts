@@ -17,8 +17,11 @@ export const MOCK_PROVIDERS: ProviderOption[] = [
     name: 'Groq',
     models: [
       'llama-3.3-70b-versatile',
-      'gemma2-9b-it',
-      'mixtral-8x7b',
+      'llama-3.1-8b-instant',
+      'openai/gpt-oss-120b',
+      'openai/gpt-oss-20b',
+      'groq/compound',
+      'groq/compound-mini',
     ],
   },
   {
@@ -42,10 +45,29 @@ export const MOCK_PROVIDERS: ProviderOption[] = [
   {
     id: 'openrouter',
     name: 'OpenRouter',
+    models: ['openrouter/free', 'openrouter/auto'],
+  },
+  {
+    id: 'sambanova',
+    name: 'SambaNova',
     models: [
-      'auto',
-      'anthropic/claude-3.5-sonnet',
-      'deepseek/deepseek-coder',
+      'Meta-Llama-3.3-70B-Instruct',
+      'DeepSeek-V3.1',
+      'MiniMax-M2.7',
+      'gpt-oss-120b',
+    ],
+  },
+  {
+    id: 'zai',
+    name: 'Z.AI',
+    models: [
+      'glm-5.1',
+      'glm-5',
+      'glm-5-turbo',
+      'glm-4.7',
+      'glm-4.6',
+      'glm-4.5',
+      'glm-4-32B-0414-128K',
     ],
   },
   {

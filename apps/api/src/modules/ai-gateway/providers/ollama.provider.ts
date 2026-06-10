@@ -3,7 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import type { Readable } from 'node:stream';
 
-import type { ProviderMessage } from '../interfaces/provider.interface';
+import type {
+  ProviderMessage,
+  ProviderModel,
+} from '../interfaces/provider.interface';
 import { BaseProvider } from './base.provider';
 
 interface OllamaChunk {
@@ -13,10 +16,18 @@ interface OllamaChunk {
   done?: boolean;
 }
 
+interface OllamaModelsResponse {
+  models?: Array<{
+    name?: string;
+    model?: string;
+  }>;
+}
+
 @Injectable()
 export class OllamaProvider extends BaseProvider {
   readonly id = 'ollama';
   readonly name = 'Ollama (Local)';
+  readonly supportsDynamicModels = true;
   readonly models = [
     'llama3.2',
     'qwen2.5-coder',
@@ -37,11 +48,23 @@ export class OllamaProvider extends BaseProvider {
     return true;
   }
 
-  protected getDefaultModel(): string {
+  getDefaultModel(): string {
     return (
       this.config.get<string>('providers.ollama.defaultModel') ??
       'llama3.2'
     );
+  }
+
+  async listModels(): Promise<ProviderModel[]> {
+    const response = await axios.get<OllamaModelsResponse>(
+      `${this.baseUrl}/api/tags`,
+      { timeout: 3000 },
+    );
+
+    return (response.data.models ?? [])
+      .map((model) => model.name || model.model || '')
+      .filter((id) => id.length > 0)
+      .map((id) => ({ id, name: id }));
   }
 
   async *stream(

@@ -3,18 +3,36 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import type { Readable } from 'node:stream';
 
-import type { ProviderMessage } from '../interfaces/provider.interface';
+import type {
+  ProviderMessage,
+  ProviderModel,
+} from '../interfaces/provider.interface';
 import { BaseProvider } from './base.provider';
+
+interface OpenRouterModelsResponse {
+  data?: Array<{
+    id?: string;
+    name?: string;
+    context_length?: number;
+    architecture?: {
+      input_modalities?: string[];
+      output_modalities?: string[];
+    };
+    pricing?: {
+      prompt?: string;
+      completion?: string;
+    };
+  }>;
+}
 
 @Injectable()
 export class OpenRouterProvider extends BaseProvider {
   readonly id = 'openrouter';
   readonly name = 'OpenRouter';
+  readonly supportsDynamicModels = true;
   readonly models = [
-    'auto',
-    'anthropic/claude-3.5-sonnet',
-    'deepseek/deepseek-coder',
-    'openai/gpt-4o',
+    'openrouter/free',
+    'openrouter/auto',
   ];
 
   private readonly apiKey: string;
@@ -41,11 +59,73 @@ export class OpenRouterProvider extends BaseProvider {
     return this.apiKey.length > 0;
   }
 
-  protected getDefaultModel(): string {
+  getDefaultModel(): string {
     return (
       this.config.get<string>('providers.openrouter.defaultModel') ??
-      'auto'
+      'openrouter/free'
     );
+  }
+
+  getFallbackModels(): string[] {
+    return [
+      ...new Set([
+        this.getDefaultModel(),
+        'openrouter/free',
+        'openrouter/auto',
+      ]),
+    ];
+  }
+
+  async listModels(): Promise<ProviderModel[]> {
+    const response = await axios.get<OpenRouterModelsResponse>(
+      `${this.baseUrl}/models`,
+      {
+        headers: this.apiKey
+          ? { Authorization: `Bearer ${this.apiKey}` }
+          : undefined,
+        timeout: 10000,
+      },
+    );
+
+    return (response.data.data ?? [])
+      .filter((model): model is typeof model & { id: string } => {
+        if (!model.id) {
+          return false;
+        }
+        const inputModalities = model.architecture?.input_modalities;
+        const outputModalities = model.architecture?.output_modalities;
+        return (
+          (!inputModalities || inputModalities.includes('text')) &&
+          (!outputModalities || outputModalities.includes('text'))
+        );
+      })
+      .map((model) => {
+        const promptPrice = Number(model.pricing?.prompt);
+        const completionPrice = Number(model.pricing?.completion);
+        const isFree =
+          model.id.endsWith(':free') ||
+          model.id === 'openrouter/free' ||
+          (promptPrice === 0 && completionPrice === 0);
+
+        return {
+          id: model.id,
+          name: model.name || model.id,
+          isFree,
+          contextLength: model.context_length,
+        };
+      })
+      .sort((left, right) => {
+        if (left.id === 'openrouter/free') {
+          return -1;
+        }
+        if (right.id === 'openrouter/free') {
+          return 1;
+        }
+        if (left.isFree !== right.isFree) {
+          return left.isFree ? -1 : 1;
+        }
+        return left.name.localeCompare(right.name);
+      });
   }
 
   async *stream(

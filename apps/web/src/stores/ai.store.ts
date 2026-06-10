@@ -2,7 +2,16 @@ import { create } from 'zustand';
 
 import { apiClient, parseSSELine } from '@/lib/api-client';
 import { MOCK_AI_RESPONSES } from '@/mock/ai-responses';
-import type { AIStreamChunk } from '@/types/api.types';
+import type {
+  AIActiveFileContext,
+  AIStreamChunk,
+  ProviderCatalogEntry,
+} from '@/types/api.types';
+
+export interface SendMessageOptions {
+  activeFile?: AIActiveFileContext;
+  autoApply?: boolean;
+}
 
 export interface ChatMessage {
   id: string;
@@ -12,6 +21,9 @@ export interface ChatMessage {
   isStreaming?: boolean;
   resolvedProvider?: string;
   resolvedModel?: string;
+  autoApplyRequested?: boolean;
+  targetFile?: AIActiveFileContext;
+  isMockResponse?: boolean;
 }
 
 export type BackendStatus = 'checking' | 'connected' | 'offline';
@@ -22,9 +34,15 @@ interface AIState {
   backendStatus: BackendStatus;
   selectedProvider: string;
   selectedModel: string;
+  providerCatalog: ProviderCatalogEntry[];
+  isCatalogLoading: boolean;
   mockResponseIndex: number;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (
+    content: string,
+    options?: SendMessageOptions,
+  ) => Promise<void>;
   checkBackend: () => Promise<void>;
+  refreshProviderCatalog: (forceRefresh?: boolean) => Promise<void>;
   setProvider: (provider: string) => void;
   setModel: (model: string) => void;
   clearMessages: () => void;
@@ -49,6 +67,8 @@ export const useAIStore = create<AIState>((set, get) => ({
   backendStatus: 'checking',
   selectedProvider: 'auto',
   selectedModel: 'Auto',
+  providerCatalog: [],
+  isCatalogLoading: false,
   mockResponseIndex: 0,
 
   checkBackend: async () => {
@@ -61,9 +81,22 @@ export const useAIStore = create<AIState>((set, get) => ({
       ...state,
       backendStatus: isConnected ? 'connected' : 'offline',
     }));
+    if (isConnected) {
+      await get().refreshProviderCatalog();
+    }
   },
 
-  sendMessage: async (content) => {
+  refreshProviderCatalog: async (forceRefresh = false) => {
+    set({ isCatalogLoading: true });
+    const providerCatalog =
+      await apiClient.getProviderCatalog(forceRefresh);
+    set((state) => ({
+      providerCatalog: providerCatalog ?? state.providerCatalog,
+      isCatalogLoading: false,
+    }));
+  },
+
+  sendMessage: async (content, options = {}) => {
     const trimmedContent = content.trim();
     const initialState = get();
     if (!trimmedContent || initialState.isLoading) {
@@ -83,6 +116,8 @@ export const useAIStore = create<AIState>((set, get) => ({
       content: '',
       timestamp: new Date(),
       isStreaming: true,
+      autoApplyRequested: options.autoApply === true,
+      targetFile: options.activeFile,
     };
     const operationId = assistantMessage.id;
     const context = initialState.messages.slice(-6).map((message) => ({
@@ -103,6 +138,8 @@ export const useAIStore = create<AIState>((set, get) => ({
       content: trimmedContent,
       provider: selectedProvider,
       model: selectedModel === 'Auto' ? 'auto' : selectedModel,
+      activeFile: options.activeFile,
+      autoApply: options.autoApply,
       context,
     });
 
@@ -234,6 +271,7 @@ export const useAIStore = create<AIState>((set, get) => ({
               isStreaming: true,
               resolvedProvider: undefined,
               resolvedModel: undefined,
+              isMockResponse: true,
             }
           : message,
       ),

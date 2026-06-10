@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   Post,
+  Query,
   Res,
 } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
@@ -37,5 +38,14 @@ export class AIGatewayController {
   @Get('providers')
   getProviders(): Record<string, boolean> {
     return this.aiGateway.getProviderStatuses();
+  }
+
+  @Get('providers/catalog')
+  getProviderCatalog(
+    @Query('refresh') refresh?: string,
+  ): Promise<
+    Awaited<ReturnType<AIGatewayService['getProviderCatalog']>>
+  > {
+    return this.aiGateway.getProviderCatalog(refresh === 'true');
   }
 }

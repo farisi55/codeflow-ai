@@ -1,9 +1,11 @@
 'use client';
 
-import { Settings } from 'lucide-react';
+import { Settings, Zap } from 'lucide-react';
+import { useEffect } from 'react';
 
 import { ModelSelector } from '@/components/ai-chat/ModelSelector';
 import { ProviderSelector } from '@/components/ai-chat/ProviderSelector';
+import { useSettingsStore } from '@/stores/settings.store';
 
 function CodeLogo() {
   return (
@@ -26,6 +28,15 @@ function CodeLogo() {
 }
 
 export function HeaderBar() {
+  const autoApply = useSettingsStore((state) => state.autoApply);
+  const toggleAutoApply = useSettingsStore(
+    (state) => state.toggleAutoApply,
+  );
+
+  useEffect(() => {
+    void useSettingsStore.persist.rehydrate();
+  }, []);
+
   return (
     <header className="flex h-10 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
       <div className="flex items-center gap-2 font-mono text-sm font-semibold text-accent">
@@ -35,6 +46,23 @@ export function HeaderBar() {
       <div className="flex items-center gap-3">
         <ProviderSelector />
         <ModelSelector />
+        <button
+          className={
+            autoApply
+              ? 'flex items-center gap-1 rounded border border-accent bg-accent px-2 py-1 text-[11px] font-medium text-white transition-all'
+              : 'flex items-center gap-1 rounded border border-border bg-surface-2 px-2 py-1 text-[11px] font-medium text-muted transition-all hover:text-foreground'
+          }
+          onClick={toggleAutoApply}
+          title={
+            autoApply
+              ? 'Auto-Apply ON - AI code applies instantly. Click to switch to Manual.'
+              : 'Manual mode - review before applying. Click to enable Auto-Apply.'
+          }
+          type="button"
+        >
+          <Zap size={11} />
+          {autoApply ? 'Auto' : 'Manual'}
+        </button>
         <button
           aria-label="Settings"
           className="rounded-md p-1.5 text-muted transition-colors hover:bg-surface-2 hover:text-foreground"

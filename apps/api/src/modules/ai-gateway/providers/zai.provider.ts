@@ -7,13 +7,17 @@ import type { ProviderMessage } from '../interfaces/provider.interface';
 import { BaseProvider } from './base.provider';
 
 @Injectable()
-export class MistralProvider extends BaseProvider {
-  readonly id = 'mistral';
-  readonly name = 'Mistral';
+export class ZaiProvider extends BaseProvider {
+  readonly id = 'zai';
+  readonly name = 'Z.AI';
   readonly models = [
-    'mistral-large-latest',
-    'codestral-latest',
-    'mistral-small-latest',
+    'glm-5.1',
+    'glm-5',
+    'glm-5-turbo',
+    'glm-4.7',
+    'glm-4.6',
+    'glm-4.5',
+    'glm-4-32B-0414-128K',
   ];
 
   private readonly apiKey: string;
@@ -22,10 +26,10 @@ export class MistralProvider extends BaseProvider {
   constructor(private readonly config: ConfigService) {
     super();
     this.apiKey =
-      this.config.get<string>('providers.mistral.apiKey') ?? '';
+      this.config.get<string>('providers.zai.apiKey') ?? '';
     this.baseUrl =
-      this.config.get<string>('providers.mistral.baseUrl') ??
-      'https://api.mistral.ai/v1';
+      this.config.get<string>('providers.zai.baseUrl') ??
+      'https://api.z.ai/api/paas/v4';
   }
 
   isAvailable(): boolean {
@@ -34,8 +38,7 @@ export class MistralProvider extends BaseProvider {
 
   getDefaultModel(): string {
     return (
-      this.config.get<string>('providers.mistral.defaultModel') ??
-      'mistral-large-latest'
+      this.config.get<string>('providers.zai.defaultModel') ?? 'glm-5.1'
     );
   }
 
@@ -55,6 +58,7 @@ export class MistralProvider extends BaseProvider {
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
+          'Accept-Language': 'en-US,en',
         },
         responseType: 'stream',
         signal,
@@ -73,6 +77,11 @@ export class MistralProvider extends BaseProvider {
           yield content;
         }
       }
+    }
+
+    const content = this.parseOpenAIStreamLine(buffer.trim());
+    if (content) {
+      yield content;
     }
   }
 }

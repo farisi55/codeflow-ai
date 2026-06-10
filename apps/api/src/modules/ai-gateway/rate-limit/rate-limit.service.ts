@@ -11,6 +11,8 @@ const PROVIDER_LIMITS: Record<string, number> = {
   mistral: 20,
   openrouter: 20,
   puter: 60,
+  sambanova: 20,
+  zai: 20,
   ollama: 999,
 };
 

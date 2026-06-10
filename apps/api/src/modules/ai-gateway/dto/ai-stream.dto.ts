@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsOptional,
   IsString,
@@ -15,6 +16,20 @@ export class ContextMessageDto {
   content!: string;
 }
 
+export class ActiveFileContextDto {
+  @IsString()
+  id!: string;
+
+  @IsString()
+  name!: string;
+
+  @IsString()
+  language!: string;
+
+  @IsString()
+  content!: string;
+}
+
 export class AIStreamDto {
   @IsString()
   content!: string;
@@ -24,6 +39,15 @@ export class AIStreamDto {
 
   @IsString()
   model!: string;
+
+  @ValidateNested()
+  @Type(() => ActiveFileContextDto)
+  @IsOptional()
+  activeFile?: ActiveFileContextDto;
+
+  @IsBoolean()
+  @IsOptional()
+  autoApply = false;
 
   @IsArray()
   @ValidateNested({ each: true })

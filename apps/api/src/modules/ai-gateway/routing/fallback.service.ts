@@ -27,6 +27,7 @@ export class FallbackService {
     providerMap: Map<string, IProvider>,
     messages: ProviderMessage[],
     requestedModel: string,
+    requestedProvider: string,
     signal?: AbortSignal,
   ): Promise<FallbackResult> {
     const tried: string[] = [];
@@ -53,41 +54,59 @@ export class FallbackService {
         continue;
       }
 
-      if (!this.rateLimit.isAllowed(providerId)) {
-        this.logger.debug(`Skipping ${providerId}: rate limited`);
-        continue;
-      }
+      const useRequestedModel =
+        requestedProvider === providerId &&
+        requestedModel.length > 0 &&
+        requestedModel !== 'auto';
+      const modelCandidates = [
+        ...new Set([
+          ...(useRequestedModel ? [requestedModel] : []),
+          ...provider.getFallbackModels(),
+        ]),
+      ];
+      let attemptedProvider = false;
 
-      tried.push(providerId);
-      const model =
-        requestedModel && requestedModel !== 'auto'
-          ? requestedModel
-          : (provider.models[0] ?? 'auto');
-
-      try {
-        this.logger.log(
-          `Trying provider: ${providerId} / model: ${model}`,
-        );
-        const generator = provider.stream(messages, model, signal);
-        const firstResult = await generator.next();
-
-        if (firstResult.done) {
-          throw new Error('Empty stream from provider');
+      for (const model of modelCandidates) {
+        if (!this.rateLimit.isAllowed(providerId)) {
+          this.logger.debug(`Skipping ${providerId}: rate limited`);
+          break;
         }
 
-        this.health.recordSuccess(providerId);
-        this.logger.log(`Using provider: ${providerId}`);
+        attemptedProvider = true;
+        tried.push(`${providerId}/${model}`);
 
-        return {
-          stream: this.prependToken(firstResult.value, generator),
-          providerId,
-          modelId: model,
-        };
-      } catch (error) {
+        try {
+          this.logger.log(
+            `Trying provider: ${providerId} / model: ${model}`,
+          );
+          const generator = provider.stream(messages, model, signal);
+          const firstResult = await generator.next();
+
+          if (firstResult.done) {
+            throw new Error('Empty stream from provider');
+          }
+
+          this.health.recordSuccess(providerId);
+          this.logger.log(
+            `Using provider: ${providerId} / model: ${model}`,
+          );
+
+          return {
+            stream: this.prependToken(firstResult.value, generator),
+            providerId,
+            modelId: model,
+          };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          this.logger.warn(
+            `Provider ${providerId} model ${model} failed: ${message}`,
+          );
+        }
+      }
+
+      if (attemptedProvider) {
         this.health.recordFailure(providerId);
-        const message =
-          error instanceof Error ? error.message : String(error);
-        this.logger.warn(`Provider ${providerId} failed: ${message}`);
       }
     }
 

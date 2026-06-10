@@ -17,7 +17,7 @@ export class TaskRouterService {
     }
 
     if (
-      /\b(refactor|clean up|improve|optimize code|restructure|rewrite)\b/.test(
+      /\b(refactor|clean up|improve|optimize code|restructure|rewrite|refaktor|rapikan|optimalkan|sederhanakan|restrukturisasi)\b/.test(
         normalized,
       )
     ) {
@@ -49,7 +49,7 @@ export class TaskRouterService {
     }
 
     if (
-      /\b(generate|create|write|implement|add (a |the )?function|build (a |the )?component|make (a |the )?)\b/.test(
+      /\b(generate|create|write|implement|add (a |the )?function|build (a |the )?component|make (a |the )?|ubah|ganti|tambahkan|tambah|hapus|perbaiki|buat|implementasikan|modifikasi)\b/.test(
         normalized,
       )
     ) {

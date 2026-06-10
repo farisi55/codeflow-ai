@@ -100,6 +100,39 @@ export const fsaAdapter = {
 
     return (await handle.requestPermission(options)) === 'granted';
   },
+
+  async createFile(
+    rootHandle: FileSystemDirectoryHandle,
+    filePath: string,
+    content: string,
+  ): Promise<FileSystemFileHandle> {
+    const parts = filePath.split('/').filter(Boolean);
+    const fileName = parts.pop();
+
+    if (!fileName) {
+      throw new Error('Invalid file path: no filename');
+    }
+
+    let currentDirectory = rootHandle;
+    for (const part of parts) {
+      currentDirectory = await currentDirectory.getDirectoryHandle(
+        part,
+        { create: true },
+      );
+    }
+
+    const fileHandle = await currentDirectory.getFileHandle(fileName, {
+      create: true,
+    });
+    const writable = await fileHandle.createWritable();
+    try {
+      await writable.write(content);
+    } finally {
+      await writable.close();
+    }
+
+    return fileHandle;
+  },
 };
 
 async function scanDirectory(

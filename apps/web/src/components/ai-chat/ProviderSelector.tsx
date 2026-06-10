@@ -7,8 +7,19 @@ import { useAIStore } from '@/stores/ai.store';
 
 export function ProviderSelector() {
   const selectedProvider = useAIStore((state) => state.selectedProvider);
+  const providerCatalog = useAIStore((state) => state.providerCatalog);
   const setProvider = useAIStore((state) => state.setProvider);
   const setModel = useAIStore((state) => state.setModel);
+  const providers =
+    providerCatalog.length > 0
+      ? [
+          { id: 'auto', name: 'Auto', available: true },
+          ...providerCatalog,
+        ]
+      : MOCK_PROVIDERS.map((provider) => ({
+          ...provider,
+          available: true,
+        }));
 
   return (
     <label className="flex flex-col gap-0.5">
@@ -23,9 +34,14 @@ export function ProviderSelector() {
           }}
           value={selectedProvider}
         >
-          {MOCK_PROVIDERS.map((provider) => (
-            <option key={provider.id} value={provider.id}>
+          {providers.map((provider) => (
+            <option
+              disabled={!provider.available}
+              key={provider.id}
+              value={provider.id}
+            >
               {provider.name}
+              {provider.available ? '' : ' (Unavailable)'}
             </option>
           ))}
         </select>

@@ -10,6 +10,8 @@ import { MistralProvider } from './providers/mistral.provider';
 import { OllamaProvider } from './providers/ollama.provider';
 import { OpenRouterProvider } from './providers/openrouter.provider';
 import { PuterProvider } from './providers/puter.provider';
+import { SambaNovaProvider } from './providers/sambanova.provider';
+import { ZaiProvider } from './providers/zai.provider';
 import { RateLimitService } from './rate-limit/rate-limit.service';
 import { FallbackService } from './routing/fallback.service';
 import { TaskRouterService } from './routing/task-router.service';
@@ -28,6 +30,8 @@ import { TaskRouterService } from './routing/task-router.service';
     MistralProvider,
     OpenRouterProvider,
     PuterProvider,
+    SambaNovaProvider,
+    ZaiProvider,
     OllamaProvider,
   ],
   exports: [AIGatewayService],
