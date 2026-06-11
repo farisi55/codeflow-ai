@@ -1,6 +1,6 @@
 'use client';
 
-import { Settings, Zap } from 'lucide-react';
+import { Bot, Settings, Zap } from 'lucide-react';
 import { useEffect } from 'react';
 
 import { ModelSelector } from '@/components/ai-chat/ModelSelector';
@@ -32,6 +32,12 @@ export function HeaderBar() {
   const toggleAutoApply = useSettingsStore(
     (state) => state.toggleAutoApply,
   );
+  const openCodeEnabled = useSettingsStore(
+    (state) => state.openCodeEnabled,
+  );
+  const toggleOpenCode = useSettingsStore(
+    (state) => state.toggleOpenCode,
+  );
 
   useEffect(() => {
     void useSettingsStore.persist.rehydrate();
@@ -46,6 +52,23 @@ export function HeaderBar() {
       <div className="flex items-center gap-3">
         <ProviderSelector />
         <ModelSelector />
+        <button
+          className={
+            openCodeEnabled
+              ? 'flex items-center gap-1 rounded border border-success bg-[rgba(63,185,80,0.15)] px-2 py-1 text-[11px] font-medium text-success transition-all'
+              : 'flex items-center gap-1 rounded border border-border bg-surface-2 px-2 py-1 text-[11px] font-medium text-muted transition-all hover:text-foreground'
+          }
+          onClick={toggleOpenCode}
+          title={
+            openCodeEnabled
+              ? 'OpenCode ON - click to use the AI Gateway'
+              : 'AI Gateway ON - click to use OpenCode'
+          }
+          type="button"
+        >
+          <Bot size={11} />
+          {openCodeEnabled ? 'OpenCode' : 'Gateway'}
+        </button>
         <button
           className={
             autoApply

@@ -2,11 +2,16 @@ import { create } from 'zustand';
 
 import { apiClient, parseSSELine } from '@/lib/api-client';
 import { puterClient } from '@/lib/puter-client';
+import type { FileNode } from '@/mock/file-tree';
 import { MOCK_AI_RESPONSES } from '@/mock/ai-responses';
+import { useEditorStore } from '@/stores/editor.store';
+import { useExplorerStore } from '@/stores/explorer.store';
+import { useSettingsStore } from '@/stores/settings.store';
 import type {
   AIActiveFileContext,
   AIFileOperation,
   AIStreamChunk,
+  OpenCodeFileContext,
   ProviderCatalogEntry,
 } from '@/types/api.types';
 
@@ -206,6 +211,8 @@ export const useAIStore = create<AIState>((set, get) => ({
     }));
     const selectedProvider = initialState.selectedProvider;
     const selectedModel = initialState.selectedModel;
+    const openCodeEnabled =
+      useSettingsStore.getState().openCodeEnabled;
     activeOperationId = operationId;
 
     set((state) => ({
@@ -215,6 +222,7 @@ export const useAIStore = create<AIState>((set, get) => ({
     }));
 
     const shouldUsePuter =
+      !openCodeEnabled &&
       (selectedProvider === 'puter' || selectedProvider === 'auto') &&
       puterClient.isLoaded() &&
       puterClient.isSignedIn();
@@ -292,15 +300,48 @@ export const useAIStore = create<AIState>((set, get) => ({
       }
     }
 
-    const stream = await apiClient.streamChat({
-      content: trimmedContent,
-      provider: selectedProvider,
-      model: selectedModel === 'Auto' ? 'auto' : selectedModel,
-      activeFile: options.activeFile,
-      fileOperation: options.fileOperation,
-      autoApply: options.autoApply,
-      context,
-    });
+    let stream: ReadableStream<Uint8Array> | null;
+    if (openCodeEnabled) {
+      const editorState = useEditorStore.getState();
+      const explorerState = useExplorerStore.getState();
+      const currentActiveFile =
+        editorState.openFiles.find(
+          (file) => file.id === editorState.activeFileId,
+        ) ?? null;
+      const activeSnapshot = options.activeFile ?? currentActiveFile;
+      const activeFile: OpenCodeFileContext | null = activeSnapshot
+        ? {
+            path: activeSnapshot.id,
+            content: activeSnapshot.content,
+            language: activeSnapshot.language,
+          }
+        : null;
+      const openFiles = buildOpenFileContext(
+        activeFile,
+        editorState.openFiles,
+      );
+
+      stream = await apiClient.streamOpenCode({
+        content: trimmedContent,
+        projectName: explorerState.projectName ?? '',
+        activeFile,
+        openFiles,
+        filePaths: flattenFileTree(explorerState.fileTree),
+        fileOperation: options.fileOperation,
+        autoApply: options.autoApply,
+        context,
+      });
+    } else {
+      stream = await apiClient.streamChat({
+        content: trimmedContent,
+        provider: selectedProvider,
+        model: selectedModel === 'Auto' ? 'auto' : selectedModel,
+        activeFile: options.activeFile,
+        fileOperation: options.fileOperation,
+        autoApply: options.autoApply,
+        context,
+      });
+    }
 
     if (activeOperationId !== operationId) {
       return;
@@ -498,3 +539,52 @@ export const useAIStore = create<AIState>((set, get) => ({
     });
   },
 }));
+
+function buildOpenFileContext(
+  activeFile: OpenCodeFileContext | null,
+  openFiles: Array<{
+    id: string;
+    content: string;
+    language: string;
+  }>,
+): OpenCodeFileContext[] {
+  const result: OpenCodeFileContext[] = [];
+  const seen = new Set<string>();
+
+  if (activeFile) {
+    result.push(activeFile);
+    seen.add(activeFile.path);
+  }
+
+  for (const file of openFiles) {
+    if (result.length >= 5) {
+      break;
+    }
+    if (seen.has(file.id)) {
+      continue;
+    }
+
+    result.push({
+      path: file.id,
+      content: file.content,
+      language: file.language,
+    });
+    seen.add(file.id);
+  }
+
+  return result;
+}
+
+function flattenFileTree(nodes: FileNode[]): string[] {
+  const paths: string[] = [];
+
+  for (const node of nodes) {
+    if (node.type === 'file') {
+      paths.push(node.id);
+    } else if (node.children) {
+      paths.push(...flattenFileTree(node.children));
+    }
+  }
+
+  return paths;
+}

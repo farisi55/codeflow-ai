@@ -229,22 +229,27 @@ export function ChatMessage({ message }: ChatMessageProps) {
       : null;
   const activeFile =
     openFiles.find((file) => file.id === activeFileId) ?? null;
+  const targetFile = message.targetFile
+    ? (openFiles.find(
+        (file) => file.id === message.targetFile?.id,
+      ) ?? null)
+    : activeFile;
   const isCreateOperation = message.fileOperation?.type === 'create';
 
   function handleApplyToFile(): void {
-    if (!codeBlock || !activeFile || activeFile.isReadOnly) {
+    if (!codeBlock || !targetFile || targetFile.isReadOnly) {
       return;
     }
 
     const codeLanguage = toMonacoLanguage(codeBlock.language);
     openDiff({
-      fileId: activeFile.id,
-      fileName: activeFile.name,
+      fileId: targetFile.id,
+      fileName: targetFile.name,
       language:
         codeLanguage === 'plaintext'
-          ? activeFile.language
+          ? targetFile.language
           : codeLanguage,
-      originalContent: activeFile.content,
+      originalContent: targetFile.content,
       modifiedContent: codeBlock.code,
     });
   }
@@ -273,18 +278,22 @@ export function ChatMessage({ message }: ChatMessageProps) {
               <span className="text-[11px] text-muted">
                 New file: {message.fileOperation?.path ?? 'auto-detect'}
               </span>
-            ) : activeFile ? (
+            ) : targetFile ? (
               <button
                 className="flex items-center gap-1.5 rounded border border-accent bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-accent transition-colors hover:bg-[rgba(47,129,247,0.15)] disabled:cursor-not-allowed disabled:border-border disabled:text-muted"
-                disabled={activeFile.isReadOnly}
+                disabled={targetFile.isReadOnly}
                 onClick={handleApplyToFile}
                 type="button"
               >
                 <Zap size={11} />
-                {activeFile.isReadOnly
-                  ? `${activeFile.name} is read-only`
-                  : `Apply to ${activeFile.name}`}
+                {targetFile.isReadOnly
+                  ? `${targetFile.name} is read-only`
+                  : `Apply to ${targetFile.name}`}
               </button>
+            ) : message.targetFile ? (
+              <span className="text-[11px] text-muted">
+                Reopen {message.targetFile.name} to apply changes
+              </span>
             ) : (
               <span className="text-[11px] text-muted">
                 Open a file to apply changes

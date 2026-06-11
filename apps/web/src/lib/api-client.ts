@@ -2,6 +2,8 @@ import type {
   AIStreamChunk,
   AIStreamRequest,
   HealthResponse,
+  OpenCodeHealthResponse,
+  OpenCodeStreamRequest,
   ProviderCatalogEntry,
 } from '@/types/api.types';
 
@@ -51,6 +53,51 @@ export const apiClient = {
       return response.body;
     } catch {
       return null;
+    }
+  },
+
+  async streamOpenCode(
+    request: OpenCodeStreamRequest,
+  ): Promise<ReadableStream<Uint8Array> | null> {
+    if (!API_URL) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/ai/opencode/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+        signal: AbortSignal.timeout(130000),
+      });
+      if (!response.ok || !response.body) {
+        return null;
+      }
+
+      return response.body;
+    } catch {
+      return null;
+    }
+  },
+
+  async checkOpenCodeHealth(): Promise<OpenCodeHealthResponse> {
+    if (!API_URL) {
+      return { installed: false };
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/ai/opencode/health`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!response.ok) {
+        return { installed: false };
+      }
+
+      return (await response.json()) as OpenCodeHealthResponse;
+    } catch {
+      return { installed: false };
     }
   },
 

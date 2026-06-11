@@ -72,6 +72,9 @@ async function bootstrap(): Promise<void> {
   logger.log(`Backend running at http://localhost:${port}`);
   logger.log(`Health check: http://localhost:${port}/health`);
   logger.log(`AI Stream:    POST http://localhost:${port}/ai/stream`);
+  logger.log(
+    `OpenCode:     POST http://localhost:${port}/ai/opencode/stream`,
+  );
 }
 
 void bootstrap();

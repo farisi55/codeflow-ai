@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils';
 import { useAIStore } from '@/stores/ai.store';
 import { useEditorStore } from '@/stores/editor.store';
+import { useSettingsStore } from '@/stores/settings.store';
 
 const statusDetails = {
   checking: {
@@ -25,6 +26,9 @@ export function StatusBar() {
   const backendStatus = useAIStore((state) => state.backendStatus);
   const selectedProvider = useAIStore((state) => state.selectedProvider);
   const selectedModel = useAIStore((state) => state.selectedModel);
+  const openCodeEnabled = useSettingsStore(
+    (state) => state.openCodeEnabled,
+  );
   const activeFile =
     openFiles.find((file) => file.id === activeFileId) ?? null;
   const status = statusDetails[backendStatus];
@@ -52,7 +56,9 @@ export function StatusBar() {
           <>
             <span className="h-3 w-px bg-white/40" />
             <span>
-              {selectedProvider} / {selectedModel}
+              {openCodeEnabled
+                ? 'opencode / Auto'
+                : `${selectedProvider} / ${selectedModel}`}
             </span>
           </>
         ) : null}

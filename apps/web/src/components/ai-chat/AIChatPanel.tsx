@@ -34,6 +34,7 @@ import { useExplorerStore } from '@/stores/explorer.store';
 import { useSettingsStore } from '@/stores/settings.store';
 
 import { ChatMessage } from './ChatMessage';
+import { OpenCodeStatusBanner } from './OpenCodeStatusBanner';
 import { PuterAuthBanner } from './PuterAuthBanner';
 
 interface Notification {
@@ -58,6 +59,9 @@ export function AIChatPanel() {
     (state) => state.selectedProvider,
   );
   const autoApply = useSettingsStore((state) => state.autoApply);
+  const openCodeEnabled = useSettingsStore(
+    (state) => state.openCodeEnabled,
+  );
   const isSaving = useEditorStore((state) => state.isSaving);
   const [input, setInput] = useState('');
   const [notification, setNotification] =
@@ -414,7 +418,10 @@ export function AIChatPanel() {
         </button>
       </div>
 
-      {selectedProvider === 'puter' || selectedProvider === 'auto' ? (
+      {openCodeEnabled ? <OpenCodeStatusBanner /> : null}
+
+      {!openCodeEnabled &&
+      (selectedProvider === 'puter' || selectedProvider === 'auto') ? (
         <PuterAuthBanner alwaysShow={selectedProvider === 'puter'} />
       ) : null}
 

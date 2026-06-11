@@ -42,6 +42,32 @@ export interface AIStreamRequest {
   }>;
 }
 
+export interface OpenCodeFileContext {
+  path: string;
+  content: string;
+  language: string;
+}
+
+export interface OpenCodeStreamRequest {
+  content: string;
+  projectName: string;
+  activeFile: OpenCodeFileContext | null;
+  openFiles: OpenCodeFileContext[];
+  filePaths: string[];
+  fileOperation?: AIFileOperation;
+  autoApply?: boolean;
+  context: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+  }>;
+}
+
+export interface OpenCodeHealthResponse {
+  installed: boolean;
+  version?: string;
+  error?: string;
+}
+
 export interface AIStreamChunk {
   type: 'chunk' | 'done' | 'error';
   content?: string;
