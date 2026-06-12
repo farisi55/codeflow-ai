@@ -1,5 +1,7 @@
 'use client';
 
+import { TerminalSquare } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 import { useAIStore } from '@/stores/ai.store';
 import { useEditorStore } from '@/stores/editor.store';
@@ -29,6 +31,12 @@ export function StatusBar() {
   const openCodeEnabled = useSettingsStore(
     (state) => state.openCodeEnabled,
   );
+  const terminalOpen = useSettingsStore(
+    (state) => state.terminalOpen,
+  );
+  const toggleTerminal = useSettingsStore(
+    (state) => state.toggleTerminal,
+  );
   const activeFile =
     openFiles.find((file) => file.id === activeFileId) ?? null;
   const status = statusDetails[backendStatus];
@@ -46,6 +54,20 @@ export function StatusBar() {
         ) : null}
       </div>
       <div className="flex items-center gap-2">
+        <button
+          aria-pressed={terminalOpen}
+          className={cn(
+            'flex items-center gap-1 rounded px-1.5 py-px transition-colors hover:bg-white/20',
+            terminalOpen && 'bg-white/20',
+          )}
+          onClick={toggleTerminal}
+          title="Toggle terminal (Ctrl+`)"
+          type="button"
+        >
+          <TerminalSquare size={11} />
+          Terminal
+        </button>
+        <span className="h-3 w-px bg-white/40" />
         <span className="flex items-center gap-1.5">
           <span
             className={cn('h-1.5 w-1.5 rounded-full', status.dotClassName)}

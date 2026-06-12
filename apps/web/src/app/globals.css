@@ -98,6 +98,39 @@ button {
   background: rgba(47, 129, 247, 0.2);
 }
 
+.panel-resize-handle-horizontal {
+  background: transparent;
+  cursor: row-resize;
+  flex: 0 0 4px;
+  height: 4px;
+  position: relative;
+  transition: background-color 150ms ease;
+  z-index: 10;
+}
+
+.panel-resize-handle-horizontal::after {
+  background: var(--color-border);
+  content: "";
+  height: 1px;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 1px;
+}
+
+.panel-resize-handle-horizontal:hover,
+.panel-resize-handle-horizontal[data-resize-handle-active] {
+  background: rgba(47, 129, 247, 0.2);
+}
+
+.xterm {
+  height: 100%;
+}
+
+.xterm .xterm-viewport {
+  overflow-y: auto;
+}
+
 @keyframes blink {
   0%,
   100% {

@@ -9,9 +9,14 @@ import {
 interface SettingsState {
   autoApply: boolean;
   openCodeEnabled: boolean;
+  projectPath: string;
+  terminalOpen: boolean;
   toggleAutoApply: () => void;
   toggleOpenCode: () => void;
+  toggleTerminal: () => void;
   setAutoApply: (value: boolean) => void;
+  setProjectPath: (value: string) => void;
+  setTerminalOpen: (value: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -19,6 +24,8 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       autoApply: false,
       openCodeEnabled: false,
+      projectPath: '',
+      terminalOpen: false,
 
       toggleAutoApply: () => {
         set((state) => ({ autoApply: !state.autoApply }));
@@ -30,8 +37,20 @@ export const useSettingsStore = create<SettingsState>()(
         }));
       },
 
+      toggleTerminal: () => {
+        set((state) => ({ terminalOpen: !state.terminalOpen }));
+      },
+
       setAutoApply: (value) => {
         set({ autoApply: value });
+      },
+
+      setProjectPath: (value) => {
+        set({ projectPath: value.trim() });
+      },
+
+      setTerminalOpen: (value) => {
+        set({ terminalOpen: value });
       },
     }),
     {
@@ -40,6 +59,8 @@ export const useSettingsStore = create<SettingsState>()(
       partialize: (state) => ({
         autoApply: state.autoApply,
         openCodeEnabled: state.openCodeEnabled,
+        projectPath: state.projectPath,
+        terminalOpen: state.terminalOpen,
       }),
       skipHydration: true,
     },

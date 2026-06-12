@@ -5,6 +5,7 @@ import {
   FastifyAdapter,
   type NestFastifyApplication,
 } from '@nestjs/platform-fastify';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
@@ -26,6 +27,7 @@ async function bootstrap(): Promise<void> {
     AppModule,
     new FastifyAdapter({ logger: false }),
   );
+  app.useWebSocketAdapter(new IoAdapter(app));
   const helmetPlugin = helmet as unknown as FastifyRegisterPlugin;
 
   await app.register(helmetPlugin, {
@@ -75,6 +77,7 @@ async function bootstrap(): Promise<void> {
   logger.log(
     `OpenCode:     POST http://localhost:${port}/ai/opencode/stream`,
   );
+  logger.log(`Terminal:     WS   http://localhost:${port}/terminal`);
 }
 
 void bootstrap();

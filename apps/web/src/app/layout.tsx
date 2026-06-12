@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 
 import { ReactQueryProvider } from '@/lib/providers';
 
+import '@xterm/xterm/css/xterm.css';
 import './globals.css';
 
 const geistSans = Geist({
