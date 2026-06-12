@@ -37,6 +37,10 @@ export class FileOperationDto {
   @IsString()
   @IsOptional()
   path?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  multiple = false;
 }
 
 export class AIStreamDto {

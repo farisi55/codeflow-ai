@@ -61,6 +61,7 @@ const PUTER_SYSTEM_PROMPT = `You are an expert AI coding assistant integrated in
 Help developers write, review, refactor, and understand code.
 Provide clear, concise, accurate responses.
 When providing code, always use markdown code blocks with the language specified.
+When the user explicitly asks to delete a project entry, include exactly "Delete file \`relative/path.ext\`" or "Delete folder \`relative/path\`" in the response so CodeFlow AI can request confirmation.
 Keep responses focused and practical.`;
 
 const PUTER_ACTIVE_FILE_PROMPT = `An active editor file is included with the user's request.
@@ -79,6 +80,14 @@ const PUTER_CREATE_FILE_PROMPT = `The user requested creation of a new file.
 - Do not rewrite or return the active reference file.
 - Do not provide alternatives, additional code blocks, or placeholders.
 The code block must contain only the final new file content.`;
+
+const PUTER_CREATE_MULTIPLE_FILES_PROMPT = `The user requested creation of multiple files.
+- Return every requested file with its complete contents.
+- Before each code block, write the relative path as a bold label, for example: **src/index.html**
+- Put each file in its own fenced markdown code block and label it with the language.
+- Do not omit files, use placeholders, or combine multiple files in one code block.
+- Include the active reference file as a labeled file when it is part of the requested project changes.
+CodeFlow AI will create or update every labeled file.`;
 
 let activeOperationId: string | null = null;
 let activeMockInterval: number | null = null;
@@ -103,21 +112,34 @@ function buildPuterMessages(
 ): PuterAIMessage[] {
   const activeFile = options.activeFile;
   const createOperation = options.fileOperation?.type === 'create';
-  const systemPrompt = createOperation
-    ? `${PUTER_SYSTEM_PROMPT}\n\n${PUTER_CREATE_FILE_PROMPT}`
-    : activeFile
-      ? `${PUTER_SYSTEM_PROMPT}\n\n${PUTER_ACTIVE_FILE_PROMPT}`
-      : PUTER_SYSTEM_PROMPT;
+  const multiFileOperation =
+    createOperation && options.fileOperation?.multiple === true;
+  const systemPrompt = multiFileOperation
+    ? `${PUTER_SYSTEM_PROMPT}\n\n${PUTER_CREATE_MULTIPLE_FILES_PROMPT}`
+    : createOperation
+      ? `${PUTER_SYSTEM_PROMPT}\n\n${PUTER_CREATE_FILE_PROMPT}`
+      : activeFile
+        ? `${PUTER_SYSTEM_PROMPT}\n\n${PUTER_ACTIVE_FILE_PROMPT}`
+        : PUTER_SYSTEM_PROMPT;
   const userContent =
     activeFile || createOperation
       ? [
           `User request: ${content}`,
           ...(createOperation
             ? [
-                `Requested operation: create new file`,
-                `Requested new file path: ${
-                  options.fileOperation?.path ?? 'infer from request'
+                `Requested operation: ${
+                  multiFileOperation
+                    ? 'create multiple files'
+                    : 'create new file'
                 }`,
+                ...(multiFileOperation
+                  ? []
+                  : [
+                      `Requested new file path: ${
+                        options.fileOperation?.path ??
+                        'infer from request'
+                      }`,
+                    ]),
               ]
             : []),
           ...(activeFile

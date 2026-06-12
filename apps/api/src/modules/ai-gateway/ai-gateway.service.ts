@@ -24,6 +24,7 @@ const DEFAULT_SYSTEM_PROMPT = `You are an expert AI coding assistant integrated 
 Help developers write, review, refactor, and understand code.
 Provide clear, concise, accurate responses.
 When providing code, always use markdown code blocks with the language specified.
+When the user explicitly asks to delete a project entry, include exactly "Delete file \`relative/path.ext\`" or "Delete folder \`relative/path\`" in the response so CodeFlow AI can request confirmation.
 Keep responses focused and practical.`;
 
 const ACTIVE_FILE_EDIT_PROMPT = `An active editor file is included with the user's request.
@@ -44,6 +45,14 @@ const CREATE_FILE_PROMPT = `The user requested creation of a new file.
 - Do not provide alternatives, additional code blocks, or placeholders.
 - You may add one short sentence outside the code block.
 The code block can be created directly in the project, so it must contain only the final new file content.`;
+
+const CREATE_MULTIPLE_FILES_PROMPT = `The user requested creation of multiple files.
+- Return every requested file with its complete contents.
+- Before each code block, write the relative path as a bold label, for example: **src/index.html**
+- Put each file in its own fenced markdown code block and label it with the language.
+- Do not omit files, use placeholders, or combine multiple files in one code block.
+- Include the active reference file as a labeled file when it is part of the requested project changes.
+CodeFlow AI will create or update every labeled file.`;
 
 const PROVIDER_CATALOG_TTL_MS = 5 * 60 * 1000;
 
@@ -109,11 +118,15 @@ export class AIGatewayService {
         ? skill.getSystemPrompt(dto.content)
         : DEFAULT_SYSTEM_PROMPT;
       const isCreateOperation = dto.fileOperation?.type === 'create';
-      const systemPrompt = isCreateOperation
-        ? `${baseSystemPrompt}\n\n${CREATE_FILE_PROMPT}`
-        : dto.activeFile
-          ? `${baseSystemPrompt}\n\n${ACTIVE_FILE_EDIT_PROMPT}`
-          : baseSystemPrompt;
+      const isMultiFileOperation =
+        isCreateOperation && dto.fileOperation?.multiple === true;
+      const systemPrompt = isMultiFileOperation
+        ? `${baseSystemPrompt}\n\n${CREATE_MULTIPLE_FILES_PROMPT}`
+        : isCreateOperation
+          ? `${baseSystemPrompt}\n\n${CREATE_FILE_PROMPT}`
+          : dto.activeFile
+            ? `${baseSystemPrompt}\n\n${ACTIVE_FILE_EDIT_PROMPT}`
+            : baseSystemPrompt;
       const userContent =
         dto.activeFile || isCreateOperation
           ? this.buildFileRequest(dto)
@@ -265,10 +278,18 @@ export class AIGatewayService {
       `User request: ${dto.content}`,
       ...(dto.fileOperation?.type === 'create'
         ? [
-            'Requested operation: create new file',
-            `Requested new file path: ${
-              dto.fileOperation.path ?? 'infer from request'
+            `Requested operation: ${
+              dto.fileOperation.multiple
+                ? 'create multiple files'
+                : 'create new file'
             }`,
+            ...(dto.fileOperation.multiple
+              ? []
+              : [
+                  `Requested new file path: ${
+                    dto.fileOperation.path ?? 'infer from request'
+                  }`,
+                ]),
           ]
         : []),
       ...(activeFile

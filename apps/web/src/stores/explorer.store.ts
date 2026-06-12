@@ -43,6 +43,15 @@ interface ExplorerState {
     filePath: string,
     content: string,
   ) => Promise<void>;
+  upsertFileInProject: (
+    filePath: string,
+    content: string,
+  ) => Promise<'created' | 'updated'>;
+  deleteEntryInProject: (
+    entryPath: string,
+    isDirectory: boolean,
+  ) => Promise<void>;
+  createFolderInProject: (folderPath: string) => Promise<void>;
   toggleFolder: (id: string) => void;
   selectNode: (id: string) => void;
   clearError: () => void;
@@ -329,6 +338,19 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
 
     await fsaAdapter.createFile(rootHandle, filePath, content);
     await get().refreshTree();
+    const parentFolders = getParentFolderPaths(filePath);
+    if (parentFolders.length > 0) {
+      set((state) => ({
+        expandedFolderIds: [
+          ...new Set([
+            ...state.expandedFolderIds,
+            ...parentFolders.filter((path) =>
+              hasFolder(state.fileTree, path),
+            ),
+          ]),
+        ],
+      }));
+    }
 
     if (!get().fileHandles.has(filePath)) {
       throw new Error(
@@ -343,6 +365,134 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     }
 
     await get().openFileInEditor(filePath);
+  },
+
+  upsertFileInProject: async (filePath, content) => {
+    const { projectSource, rootHandle, fileHandles } = get();
+    if (projectSource !== 'fsa' || !rootHandle) {
+      throw new Error(
+        projectSource === 'zip'
+          ? 'ZIP projects are read-only. Open a folder project to write files.'
+          : 'No project is open. Open a folder first.',
+      );
+    }
+
+    const existingPath = findCaseInsensitivePath(
+      fileHandles.keys(),
+      filePath,
+    );
+    const actualPath = existingPath ?? filePath;
+    const existingHandle = existingPath
+      ? fileHandles.get(existingPath)
+      : undefined;
+    const operation = existingHandle ? 'updated' : 'created';
+
+    if (existingHandle) {
+      await fsaAdapter.writeFile(existingHandle, content);
+    } else {
+      await fsaAdapter.createFile(rootHandle, filePath, content);
+    }
+
+    await get().refreshTree();
+    const parentFolders = getParentFolderPaths(actualPath);
+    if (parentFolders.length > 0) {
+      set((state) => ({
+        expandedFolderIds: [
+          ...new Set([
+            ...state.expandedFolderIds,
+            ...parentFolders.filter((path) =>
+              hasFolder(state.fileTree, path),
+            ),
+          ]),
+        ],
+      }));
+    }
+
+    const { useEditorStore } = await import('@/stores/editor.store');
+    const editorStore = useEditorStore.getState();
+    const openFile = editorStore.openFiles.find(
+      (file) => file.id === actualPath,
+    );
+
+    if (openFile?.isReadOnly) {
+      editorStore.closeFile(actualPath);
+      await get().openFileInEditor(actualPath);
+    } else if (openFile) {
+      editorStore.updateContent(actualPath, content);
+      editorStore.markClean(actualPath);
+      editorStore.setActiveFile(actualPath);
+    } else {
+      await get().openFileInEditor(actualPath);
+    }
+
+    return operation;
+  },
+
+  deleteEntryInProject: async (entryPath, isDirectory) => {
+    const { projectSource, rootHandle } = get();
+    if (projectSource !== 'fsa' || !rootHandle) {
+      throw new Error(
+        projectSource === 'zip'
+          ? 'ZIP projects are read-only. Open a folder project to delete entries.'
+          : 'No project is open.',
+      );
+    }
+
+    await fsaAdapter.deleteEntry(
+      rootHandle,
+      entryPath,
+      isDirectory,
+    );
+
+    const { useEditorStore } = await import('@/stores/editor.store');
+    const editorStore = useEditorStore.getState();
+    for (const file of [...editorStore.openFiles]) {
+      if (
+        file.id === entryPath ||
+        (isDirectory && file.id.startsWith(`${entryPath}/`))
+      ) {
+        editorStore.closeFile(file.id);
+      }
+    }
+
+    const selectedNodeId = get().selectedNodeId;
+    if (
+      selectedNodeId === entryPath ||
+      (isDirectory &&
+        selectedNodeId?.startsWith(`${entryPath}/`))
+    ) {
+      set({ selectedNodeId: null });
+    }
+
+    await get().refreshTree();
+  },
+
+  createFolderInProject: async (folderPath) => {
+    const { projectSource, rootHandle } = get();
+    if (projectSource !== 'fsa' || !rootHandle) {
+      throw new Error(
+        projectSource === 'zip'
+          ? 'ZIP projects are read-only.'
+          : 'No project is open.',
+      );
+    }
+
+    await fsaAdapter.createFolder(rootHandle, folderPath);
+    await get().refreshTree();
+    const foldersToExpand = [
+      ...getParentFolderPaths(folderPath),
+      folderPath,
+    ];
+    set((state) => ({
+      expandedFolderIds: [
+        ...new Set([
+          ...state.expandedFolderIds,
+          ...foldersToExpand.filter((path) =>
+            hasFolder(state.fileTree, path),
+          ),
+        ]),
+      ],
+    }));
   },
 
   toggleFolder: (id) => {
@@ -432,4 +582,26 @@ function topLevelFolderIds(tree: FileNode[]): string[] {
 function hasFolder(tree: FileNode[], targetId: string): boolean {
   const node = findNode(tree, targetId);
   return node?.type === 'folder';
+}
+
+function findCaseInsensitivePath(
+  paths: Iterable<string>,
+  targetPath: string,
+): string | null {
+  const normalizedTarget = targetPath.toLowerCase();
+  for (const path of paths) {
+    if (path.toLowerCase() === normalizedTarget) {
+      return path;
+    }
+  }
+  return null;
+}
+
+function getParentFolderPaths(entryPath: string): string[] {
+  const parts = entryPath.split('/').filter(Boolean);
+  parts.pop();
+
+  return parts.map((_, index) =>
+    parts.slice(0, index + 1).join('/'),
+  );
 }

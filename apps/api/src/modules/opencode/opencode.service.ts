@@ -24,6 +24,7 @@ export interface OpenFileContext {
 export interface OpenCodeFileOperation {
   type: 'create';
   path?: string;
+  multiple?: boolean;
 }
 
 export interface OpenCodeContextMessage {
@@ -139,6 +140,7 @@ export class OpenCodeService {
         'Use only the project context supplied below.',
         'Do not inspect or modify the local filesystem and do not run tools.',
         'Return proposed code changes as text; CodeFlow AI will apply them.',
+        'For an explicit deletion request, include exactly "Delete file `relative/path.ext`" or "Delete folder `relative/path`" so CodeFlow AI can request confirmation.',
       ].join('\n'),
       projectName ? `Project: ${projectName}` : '',
       filePaths
@@ -337,6 +339,21 @@ export class OpenCodeService {
   }
 
   private buildOutputContract(params: OpenCodeChatParams): string {
+    if (
+      params.fileOperation?.type === 'create' &&
+      params.fileOperation.multiple
+    ) {
+      return [
+        'Required output format:',
+        'Return every requested file with its complete contents.',
+        'Before each code block, write its relative path as a bold label, for example: **src/index.html**',
+        'Use one fenced markdown code block per file and label each block with its language.',
+        'Do not omit files, use placeholders, or combine files in one code block.',
+        'Include the active reference file as a labeled file when it is part of the requested project changes.',
+        'CodeFlow AI will create or update every labeled file.',
+      ].join('\n');
+    }
+
     if (params.fileOperation?.type === 'create') {
       return [
         'Required output format:',

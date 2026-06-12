@@ -48,6 +48,10 @@ class OpenCodeFileOperationDto {
   @IsString()
   @IsOptional()
   path?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  multiple = false;
 }
 
 class OpenCodeStreamDto {

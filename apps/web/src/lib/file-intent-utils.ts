@@ -50,11 +50,12 @@ const ALLOWED_EXTENSIONLESS_FILENAMES = new Set(['dockerfile']);
 const EXPLICIT_FILE_PATTERN =
   /(?:^|[\s"'`(])((?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.[A-Za-z0-9]+)(?=$|[\s"'`),;:])/g;
 const DIRECT_CREATE_TARGET_PATTERN =
-  /\b(?:create|make|generate|buat|bikin|ciptakan|add|tambah|tambahkan)\b[\s:,-]*(?:(?:a|an|sebuah|new|baru|file|berkas)\s+){0,4}["'`]?((?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.[A-Za-z0-9]+)/i;
+  /\b(?:create|make|generate|buat(?:lah|kan)?|bikin(?:kan)?|ciptakan|add|tambah|tambahkan)\b[\s:,-]*(?:(?:a|an|sebuah|new|baru|file|berkas)\s+){0,4}["'`]?((?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.[A-Za-z0-9]+)/i;
 
 export interface CreateFileIntent {
   type: 'create';
   path?: string;
+  multiple?: boolean;
 }
 
 const LANGUAGE_KEYWORDS: Array<{
@@ -88,7 +89,9 @@ export function detectCreateFileIntent(
   const directTargetPath =
     prompt.match(DIRECT_CREATE_TARGET_PATTERN)?.[1];
   const hasDirectCreateAction =
-    /\b(create|make|generate|buat|bikin|ciptakan)\b/i.test(prompt);
+    /\b(create|make|generate|buat(?:lah|kan)?|bikin(?:kan)?|ciptakan)\b/i.test(
+      prompt,
+    );
   const mentionsFile = /\b(file|berkas)\b/i.test(prompt);
   const mentionsNewFile =
     /\b(new|baru)\b[\s\S]{0,30}\b(file|berkas)\b|\b(file|berkas)\b[\s\S]{0,30}\b(new|baru)\b/i.test(
@@ -98,16 +101,34 @@ export function detectCreateFileIntent(
     /\b(add|tambah|tambahkan)\b[\s\S]{0,40}\b(file|berkas)\b/i.test(
       prompt,
     ) && Boolean(directTargetPath || explicitPaths.length || mentionsNewFile);
+  const mentionedLanguages = new Set(
+    LANGUAGE_KEYWORDS.filter(({ pattern }) => pattern.test(prompt)).map(
+      ({ language }) => language,
+    ),
+  );
+  const explicitlyMultiple =
+    /\b(?:multiple|several|many|beberapa|semua|all|\d+)\s+(?:files?|berkas)\b/i.test(
+      prompt,
+    );
+  const isMultiFileRequest =
+    explicitPaths.length > 1 ||
+    explicitlyMultiple ||
+    (hasDirectCreateAction && mentionedLanguages.size > 1);
 
   if (
     !(
       (hasDirectCreateAction &&
         (mentionsFile || directTargetPath || explicitPaths.length > 0)) ||
       hasAddNewFileAction ||
-      mentionsNewFile
+      mentionsNewFile ||
+      isMultiFileRequest
     )
   ) {
     return null;
+  }
+
+  if (isMultiFileRequest) {
+    return { type: 'create', multiple: true };
   }
 
   if (

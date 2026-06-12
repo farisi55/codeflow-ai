@@ -22,6 +22,7 @@ import {
 import {
   getAutoApplyFileBlock,
   getLargestFileBlock,
+  getNamedFileBlocks,
 } from '@/lib/diff-utils';
 import {
   detectCreateFileIntent,
@@ -104,23 +105,50 @@ export function AIChatPanel() {
 
     const isCreateOperation =
       lastMessage.fileOperation?.type === 'create';
-    const codeBlock = isCreateOperation
-      ? getAutoApplyFileBlock(lastMessage.content)
-      : lastMessage.targetFile
-        ? getAutoApplyFileBlock(
-          lastMessage.content,
-          lastMessage.targetFile.language,
-        )
-        : getLargestFileBlock(lastMessage.content);
-    if (!codeBlock) {
+    const detectedNamedBlocks = getNamedFileBlocks(
+      lastMessage.content,
+    );
+    const singleNamedTarget =
+      detectedNamedBlocks.length === 1 &&
+      !isCreateOperation &&
+      lastMessage.targetFile &&
+      isSameFilePath(
+        detectedNamedBlocks[0]?.filename,
+        lastMessage.targetFile.id,
+        lastMessage.targetFile.name,
+      )
+        ? detectedNamedBlocks[0]
+        : null;
+    const namedFileBlocks = singleNamedTarget
+      ? []
+      : detectedNamedBlocks;
+    const codeBlock =
+      namedFileBlocks.length > 0
+        ? null
+        : singleNamedTarget
+          ? {
+              ...singleNamedTarget,
+              isLikelyFileContent: true,
+            }
+          : isCreateOperation
+            ? getAutoApplyFileBlock(lastMessage.content)
+            : lastMessage.targetFile
+              ? getAutoApplyFileBlock(
+                  lastMessage.content,
+                  lastMessage.targetFile.language,
+                )
+              : getLargestFileBlock(lastMessage.content);
+    if (namedFileBlocks.length === 0 && !codeBlock) {
       appliedIds.current.add(lastMessage.id);
       setNotification({
         type: 'error',
-        message: isCreateOperation
-          ? 'Auto-Apply skipped - AI did not return exactly one complete new file'
-          : lastMessage.targetFile
-          ? `Auto-Apply skipped - AI did not return one complete ${lastMessage.targetFile.name} code block`
-          : 'Auto-Apply skipped - AI did not return a complete file',
+        message: lastMessage.fileOperation?.multiple
+          ? 'Auto-Apply skipped - AI did not return named file blocks'
+          : isCreateOperation
+            ? 'Auto-Apply skipped - AI did not return exactly one complete new file'
+            : lastMessage.targetFile
+              ? `Auto-Apply skipped - AI did not return one complete ${lastMessage.targetFile.name} code block`
+              : 'Auto-Apply skipped - AI did not return a complete file',
         canUndo: false,
       });
       return;
@@ -142,6 +170,53 @@ export function AIChatPanel() {
           });
           appliedIds.current.delete(lastMessage.id);
           return;
+        }
+
+        if (namedFileBlocks.length > 0) {
+          let createdCount = 0;
+          let updatedCount = 0;
+          let failedCount = 0;
+
+          for (const block of namedFileBlocks) {
+            if (!block.filename) {
+              failedCount += 1;
+              continue;
+            }
+
+            try {
+              const operation =
+                await explorerStore.upsertFileInProject(
+                  block.filename,
+                  block.code,
+                );
+              if (operation === 'created') {
+                createdCount += 1;
+              } else {
+                updatedCount += 1;
+              }
+            } catch {
+              failedCount += 1;
+            }
+          }
+
+          const successCount = createdCount + updatedCount;
+          setNotification({
+            type: successCount > 0 ? 'success' : 'error',
+            message:
+              failedCount === 0
+                ? `Wrote ${successCount} file${
+                    successCount === 1 ? '' : 's'
+                  } (${createdCount} created, ${updatedCount} updated)`
+                : `Wrote ${successCount}/${namedFileBlocks.length} files; ${failedCount} failed`,
+            canUndo: false,
+          });
+          return;
+        }
+
+        if (!codeBlock) {
+          throw new Error(
+            'Auto-Apply skipped - no complete file was returned',
+          );
         }
 
         if (isCreateOperation) {
@@ -520,5 +595,21 @@ export function AIChatPanel() {
         </p>
       </form>
     </aside>
+  );
+}
+
+function isSameFilePath(
+  detectedPath: string | null | undefined,
+  targetId: string,
+  targetName: string,
+): boolean {
+  if (!detectedPath) {
+    return false;
+  }
+
+  const normalized = detectedPath.toLowerCase();
+  return (
+    normalized === targetId.toLowerCase() ||
+    normalized === targetName.toLowerCase()
   );
 }

@@ -8,6 +8,7 @@ export interface AIActiveFileContext {
 export interface AIFileOperation {
   type: 'create';
   path?: string;
+  multiple?: boolean;
 }
 
 export interface ProviderModelInfo {

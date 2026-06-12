@@ -106,7 +106,7 @@ export const fsaAdapter = {
     filePath: string,
     content: string,
   ): Promise<FileSystemFileHandle> {
-    const parts = filePath.split('/').filter(Boolean);
+    const parts = normalizeRelativePath(filePath);
     const fileName = parts.pop();
 
     if (!fileName) {
@@ -132,6 +132,45 @@ export const fsaAdapter = {
     }
 
     return fileHandle;
+  },
+
+  async deleteEntry(
+    rootHandle: FileSystemDirectoryHandle,
+    entryPath: string,
+    isDirectory: boolean,
+  ): Promise<void> {
+    const parts = normalizeRelativePath(entryPath);
+    const name = parts.pop();
+    if (!name) {
+      throw new Error('Invalid path: empty');
+    }
+
+    let currentDirectory = rootHandle;
+    for (const part of parts) {
+      currentDirectory =
+        await currentDirectory.getDirectoryHandle(part);
+    }
+
+    await currentDirectory.removeEntry(name, {
+      recursive: isDirectory,
+    });
+  },
+
+  async createFolder(
+    rootHandle: FileSystemDirectoryHandle,
+    folderPath: string,
+  ): Promise<FileSystemDirectoryHandle> {
+    const parts = normalizeRelativePath(folderPath);
+    let currentDirectory = rootHandle;
+
+    for (const part of parts) {
+      currentDirectory =
+        await currentDirectory.getDirectoryHandle(part, {
+          create: true,
+        });
+    }
+
+    return currentDirectory;
   },
 };
 
@@ -194,4 +233,18 @@ function sortNodes(nodes: FileNode[]): FileNode[] {
     }
     return left.name.localeCompare(right.name);
   });
+}
+
+function normalizeRelativePath(entryPath: string): string[] {
+  const normalized = entryPath.replace(/\\/g, '/').replace(/^\.?\//, '');
+  const parts = normalized.split('/').filter(Boolean);
+
+  if (
+    parts.length === 0 ||
+    parts.some((part) => part === '.' || part === '..')
+  ) {
+    throw new Error(`Invalid project path: ${entryPath}`);
+  }
+
+  return parts;
 }
