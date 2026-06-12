@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { ServerResponse } from 'node:http';
 
 import { SkillsService } from '../skills/skills.service';
+import { WebSearchService } from '../web-search/web-search.service';
 import type { AIStreamDto } from './dto/ai-stream.dto';
 import type {
   IProvider,
@@ -74,6 +75,7 @@ export class AIGatewayService {
     private readonly taskRouter: TaskRouterService,
     private readonly fallback: FallbackService,
     private readonly skills: SkillsService,
+    private readonly webSearch: WebSearchService,
     groq: GroqProvider,
     gemini: GeminiProvider,
     mistral: MistralProvider,
@@ -120,13 +122,30 @@ export class AIGatewayService {
       const isCreateOperation = dto.fileOperation?.type === 'create';
       const isMultiFileOperation =
         isCreateOperation && dto.fileOperation?.multiple === true;
-      const systemPrompt = isMultiFileOperation
-        ? `${baseSystemPrompt}\n\n${CREATE_MULTIPLE_FILES_PROMPT}`
+      const operationPrompt = isMultiFileOperation
+        ? CREATE_MULTIPLE_FILES_PROMPT
         : isCreateOperation
-          ? `${baseSystemPrompt}\n\n${CREATE_FILE_PROMPT}`
+          ? CREATE_FILE_PROMPT
           : dto.activeFile
-            ? `${baseSystemPrompt}\n\n${ACTIVE_FILE_EDIT_PROMPT}`
-            : baseSystemPrompt;
+            ? ACTIVE_FILE_EDIT_PROMPT
+            : '';
+      const webContext = await this.getWebContext(dto.content, send);
+      const webPrompt = webContext
+        ? [
+            'Web browsing is available through CodeFlow AI.',
+            'When web context is provided, use it to answer current/latest/API documentation questions.',
+            'Cite relevant URLs from the web context.',
+            '',
+            webContext,
+          ].join('\n')
+        : '';
+      const systemPrompt = [
+        baseSystemPrompt,
+        operationPrompt,
+        webPrompt,
+      ]
+        .filter(Boolean)
+        .join('\n\n');
       const userContent =
         dto.activeFile || isCreateOperation
           ? this.buildFileRequest(dto)
@@ -269,6 +288,53 @@ export class AIGatewayService {
           (id === 'openrouter/free' || id.endsWith(':free')),
       }),
     );
+  }
+
+  private async getWebContext(
+    userRequest: string,
+    send: (chunk: object) => void,
+  ): Promise<string> {
+    if (!this.webSearch.shouldBrowse(userRequest)) {
+      return '';
+    }
+
+    if (!this.webSearch.isAvailable()) {
+      send({
+        type: 'web_search',
+        status: 'skipped',
+        reason:
+          'Web browsing requested but TAVILY_API_KEY and FIRECRAWL_API_KEY are not configured',
+      });
+      return '';
+    }
+
+    send({
+      type: 'web_search',
+      status: 'searching',
+      query: userRequest,
+    });
+
+    const result = await this.webSearch.search(userRequest);
+    if (!result) {
+      send({
+        type: 'web_search',
+        status: 'failed',
+        reason: 'All web search providers failed or returned no results',
+      });
+      return '';
+    }
+
+    send({
+      type: 'web_search',
+      status: 'done',
+      provider: result.provider,
+      results: result.results.map((item) => ({
+        title: item.title,
+        url: item.url,
+      })),
+    });
+
+    return this.webSearch.formatForPrompt(result);
   }
 
   private buildFileRequest(dto: AIStreamDto): string {

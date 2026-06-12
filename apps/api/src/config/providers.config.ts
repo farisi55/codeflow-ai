@@ -49,4 +49,12 @@ export const providersConfig = registerAs('providers', () => ({
     baseUrl: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434',
     defaultModel: process.env.OLLAMA_DEFAULT_MODEL ?? 'llama3.2',
   },
+  webSearch: {
+    tavily: {
+      apiKey: process.env.TAVILY_API_KEY ?? '',
+    },
+    firecrawl: {
+      apiKey: process.env.FIRECRAWL_API_KEY ?? '',
+    },
+  },
 }));

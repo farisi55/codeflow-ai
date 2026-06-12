@@ -102,6 +102,29 @@ function stopMockStream(): void {
   resolveMockStream = null;
 }
 
+function shouldUseBackendBrowsing(content: string): boolean {
+  const text = content.toLowerCase();
+  return [
+    'internet',
+    'web',
+    'browse',
+    'browsing',
+    'search',
+    'cari',
+    'mencari',
+    'google',
+    'documentation',
+    'docs',
+    'api spec',
+    'spesifikasi api',
+    'latest',
+    'terbaru',
+    'current',
+    'up to date',
+    'update terbaru',
+  ].some((keyword) => text.includes(keyword));
+}
+
 function buildPuterMessages(
   content: string,
   context: Array<{
@@ -165,6 +188,39 @@ function buildPuterMessages(
     ...context,
     { role: 'user', content: userContent },
   ];
+}
+
+function formatWebSearchStatus(chunk: AIStreamChunk): string {
+  if (chunk.type !== 'web_search') {
+    return '';
+  }
+
+  if (chunk.status === 'searching') {
+    return `🔎 Browsing the web for: ${chunk.query ?? 'current request'}`;
+  }
+
+  if (chunk.status === 'done') {
+    const links = (chunk.results ?? [])
+      .slice(0, 3)
+      .map((item) => `- [${item.title}](${item.url})`)
+      .join('\n');
+    return [
+      `✅ Web browsing completed via ${chunk.provider ?? 'provider'}.`,
+      links,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  if (chunk.status === 'skipped') {
+    return `⚠️ Web browsing skipped: ${chunk.reason ?? 'not configured'}`;
+  }
+
+  if (chunk.status === 'failed') {
+    return `⚠️ Web browsing failed: ${chunk.reason ?? 'all providers failed'}`;
+  }
+
+  return '';
 }
 
 export const useAIStore = create<AIState>((set, get) => ({
@@ -243,7 +299,10 @@ export const useAIStore = create<AIState>((set, get) => ({
       isLoading: true,
     }));
 
+    const requiresBackendBrowsing =
+      shouldUseBackendBrowsing(trimmedContent);
     const shouldUsePuter =
+      !requiresBackendBrowsing &&
       !openCodeEnabled &&
       (selectedProvider === 'puter' || selectedProvider === 'auto') &&
       puterClient.isLoaded() &&
@@ -413,6 +472,27 @@ export const useAIStore = create<AIState>((set, get) => ({
                     : message,
                 ),
               }));
+              continue;
+            }
+
+            if (chunk.type === 'web_search') {
+              const statusText = formatWebSearchStatus(chunk);
+              if (statusText) {
+                set((state) => ({
+                  ...state,
+                  messages: state.messages.map((message) =>
+                    message.id === assistantMessage.id
+                      ? {
+                          ...message,
+                          content:
+                            message.content.length > 0
+                              ? `${message.content}\n\n${statusText}`
+                              : statusText,
+                        }
+                      : message,
+                  ),
+                }));
+              }
               continue;
             }
 

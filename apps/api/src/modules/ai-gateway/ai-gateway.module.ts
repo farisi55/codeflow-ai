@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { SkillsModule } from '../skills/skills.module';
+import { WebSearchModule } from '../web-search/web-search.module';
 import { AIGatewayController } from './ai-gateway.controller';
 import { AIGatewayService } from './ai-gateway.service';
 import { ProviderHealthService } from './health/provider-health.service';
@@ -17,7 +18,7 @@ import { FallbackService } from './routing/fallback.service';
 import { TaskRouterService } from './routing/task-router.service';
 
 @Module({
-  imports: [SkillsModule],
+  imports: [SkillsModule, WebSearchModule],
   controllers: [AIGatewayController],
   providers: [
     AIGatewayService,

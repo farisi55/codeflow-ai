@@ -70,11 +70,18 @@ export interface OpenCodeHealthResponse {
 }
 
 export interface AIStreamChunk {
-  type: 'chunk' | 'done' | 'error';
+  type: 'chunk' | 'done' | 'error' | 'web_search';
   content?: string;
   provider?: string;
   model?: string;
   error?: string;
+  status?: 'searching' | 'done' | 'failed' | 'skipped';
+  query?: string;
+  reason?: string;
+  results?: Array<{
+    title: string;
+    url: string;
+  }>;
 }
 
 export interface HealthResponse {

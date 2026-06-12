@@ -15,6 +15,8 @@ import { tmpdir } from 'os';
 import { delimiter, join } from 'path';
 import type { Readable } from 'stream';
 
+import { WebSearchService } from '../web-search/web-search.service';
+
 export interface OpenFileContext {
   path: string;
   content: string;
@@ -41,6 +43,7 @@ export interface OpenCodeChatParams {
   fileOperation?: OpenCodeFileOperation;
   autoApply?: boolean;
   context?: OpenCodeContextMessage[];
+  webContext?: string;
 }
 
 interface OpenCodeJsonEvent {
@@ -72,7 +75,10 @@ export class OpenCodeService {
     'codeflow-opencode-context',
   );
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly webSearch: WebSearchService,
+  ) {
     const configuredTimeout = Number.parseInt(
       this.config.get<string>('OPENCODE_TIMEOUT_MS') ?? '',
       10,
@@ -158,6 +164,13 @@ export class OpenCodeService {
             ),
           ].join('\n\n')
         : '',
+      params.webContext
+        ? [
+            'Web browsing results:',
+            'Use these external results for current/latest/API documentation questions. Cite URLs when using facts from them.',
+            params.webContext,
+          ].join('\n')
+        : '',
       activeFile
         ? formatFileContext(
             'Active file',
@@ -191,7 +204,8 @@ export class OpenCodeService {
     }
 
     mkdirSync(this.workingDirectory, { recursive: true });
-    const prompt = this.buildPrompt(params);
+    const webContext = await this.getWebContext(params.content, response);
+    const prompt = this.buildPrompt({ ...params, webContext });
     this.logger.log(
       `Running OpenCode with injected context for project "${params.projectName || 'untitled'}" (${prompt.length} characters)`,
     );
@@ -336,6 +350,53 @@ export class OpenCodeService {
         response.end();
       }
     }
+  }
+
+  private async getWebContext(
+    userRequest: string,
+    response: ServerResponse,
+  ): Promise<string> {
+    if (!this.webSearch.shouldBrowse(userRequest)) {
+      return '';
+    }
+
+    if (!this.webSearch.isAvailable()) {
+      this.send(response, {
+        type: 'web_search',
+        status: 'skipped',
+        reason:
+          'Web browsing requested but TAVILY_API_KEY and FIRECRAWL_API_KEY are not configured',
+      });
+      return '';
+    }
+
+    this.send(response, {
+      type: 'web_search',
+      status: 'searching',
+      query: userRequest,
+    });
+
+    const result = await this.webSearch.search(userRequest);
+    if (!result) {
+      this.send(response, {
+        type: 'web_search',
+        status: 'failed',
+        reason: 'All web search providers failed or returned no results',
+      });
+      return '';
+    }
+
+    this.send(response, {
+      type: 'web_search',
+      status: 'done',
+      provider: result.provider,
+      results: result.results.map((item) => ({
+        title: item.title,
+        url: item.url,
+      })),
+    });
+
+    return this.webSearch.formatForPrompt(result);
   }
 
   private buildOutputContract(params: OpenCodeChatParams): string {
