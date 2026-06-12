@@ -4,7 +4,6 @@ import {
   FolderPen,
   RotateCcw,
   TerminalSquare,
-  X,
 } from 'lucide-react';
 
 import type { TerminalReadyInfo } from '@/lib/terminal-socket';
@@ -23,9 +22,6 @@ export function TerminalHeader({
 }: TerminalHeaderProps) {
   const setProjectPath = useSettingsStore(
     (state) => state.setProjectPath,
-  );
-  const setTerminalOpen = useSettingsStore(
-    (state) => state.setTerminalOpen,
   );
 
   return (
@@ -67,15 +63,6 @@ export function TerminalHeader({
           type="button"
         >
           <FolderPen size={13} />
-        </button>
-        <button
-          aria-label="Close terminal"
-          className="rounded p-1 text-muted hover:bg-surface-2 hover:text-foreground"
-          onClick={() => setTerminalOpen(false)}
-          title="Close terminal"
-          type="button"
-        >
-          <X size={13} />
         </button>
       </div>
     </header>

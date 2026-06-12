@@ -1,6 +1,6 @@
 'use client';
 
-import { TerminalSquare } from 'lucide-react';
+import { Eye, TerminalSquare } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { useAIStore } from '@/stores/ai.store';
@@ -34,9 +34,13 @@ export function StatusBar() {
   const terminalOpen = useSettingsStore(
     (state) => state.terminalOpen,
   );
-  const toggleTerminal = useSettingsStore(
-    (state) => state.toggleTerminal,
+  const bottomPanelTab = useSettingsStore(
+    (state) => state.bottomPanelTab,
   );
+  const toggleBottomPanel = useSettingsStore(
+    (state) => state.toggleBottomPanel,
+  );
+
   const activeFile =
     openFiles.find((file) => file.id === activeFileId) ?? null;
   const status = statusDetails[backendStatus];
@@ -55,17 +59,30 @@ export function StatusBar() {
       </div>
       <div className="flex items-center gap-2">
         <button
-          aria-pressed={terminalOpen}
+          aria-pressed={terminalOpen && bottomPanelTab === 'terminal'}
           className={cn(
             'flex items-center gap-1 rounded px-1.5 py-px transition-colors hover:bg-white/20',
-            terminalOpen && 'bg-white/20',
+            terminalOpen && bottomPanelTab === 'terminal' && 'bg-white/20',
           )}
-          onClick={toggleTerminal}
+          onClick={() => toggleBottomPanel('terminal')}
           title="Toggle terminal (Ctrl+`)"
           type="button"
         >
           <TerminalSquare size={11} />
           Terminal
+        </button>
+        <button
+          aria-pressed={terminalOpen && bottomPanelTab === 'preview'}
+          className={cn(
+            'flex items-center gap-1 rounded px-1.5 py-px transition-colors hover:bg-white/20',
+            terminalOpen && bottomPanelTab === 'preview' && 'bg-white/20',
+          )}
+          onClick={() => toggleBottomPanel('preview')}
+          title="Toggle preview"
+          type="button"
+        >
+          <Eye size={11} />
+          Preview
         </button>
         <span className="h-3 w-px bg-white/40" />
         <span className="flex items-center gap-1.5">

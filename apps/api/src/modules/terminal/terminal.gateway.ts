@@ -38,24 +38,14 @@ type CorsCallback = (
   allow?: boolean,
 ) => void;
 
-function isLocalOrigin(origin: string): boolean {
-  try {
-    const url = new URL(origin);
-    return (
-      (url.protocol === 'http:' || url.protocol === 'https:') &&
-      ['localhost', '127.0.0.1', '::1'].includes(url.hostname)
-    );
-  } catch {
-    return false;
-  }
-}
-
-function isConfiguredOrigin(origin: string): boolean {
-  return (process.env.CORS_ORIGIN ?? '')
+function configuredOrigins(): string[] {
+  return (
+    process.env.CORS_ORIGIN?.trim() ||
+    'http://localhost:3000,http://127.0.0.1:3000'
+  )
     .split(',')
     .map((item) => item.trim())
-    .filter(Boolean)
-    .includes(origin);
+    .filter(Boolean);
 }
 
 function isLoopbackAddress(address: string): boolean {
@@ -73,8 +63,7 @@ function allowTerminalOrigin(
 ): void {
   if (
     origin === undefined ||
-    isLocalOrigin(origin) ||
-    isConfiguredOrigin(origin)
+    configuredOrigins().includes(origin)
   ) {
     callback(null, true);
     return;
@@ -98,18 +87,7 @@ export class TerminalGateway
   private readonly workingDirectories = new Map<string, string>();
 
   handleConnection(client: Socket): void {
-    const remoteAccessEnabled =
-      process.env.TERMINAL_ALLOW_REMOTE?.toLowerCase() === 'true';
-    if (
-      !remoteAccessEnabled &&
-      !isLoopbackAddress(client.handshake.address)
-    ) {
-      this.emitError(
-        client,
-        new Error('Remote terminal connections are disabled.'),
-      );
-      client.disconnect(true);
-    }
+    this.ensureClientAllowed(client);
   }
 
   handleDisconnect(client: Socket): void {
@@ -122,6 +100,10 @@ export class TerminalGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: TerminalStartPayload,
   ): void {
+    if (!this.ensureClientAllowed(client)) {
+      return;
+    }
+
     try {
       this.assertTerminalEnabled();
       const cwd = this.resolveWorkingDirectory(payload?.projectPath);
@@ -143,6 +125,9 @@ export class TerminalGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() input: unknown,
   ): void {
+    if (!this.ensureClientAllowed(client)) {
+      return;
+    }
     if (typeof input !== 'string') {
       this.emitError(client, new Error('Terminal input must be text.'));
       return;
@@ -162,6 +147,9 @@ export class TerminalGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: TerminalResizePayload,
   ): void {
+    if (!this.ensureClientAllowed(client)) {
+      return;
+    }
     const session = this.sessions.get(client.id);
     if (!session) {
       return;
@@ -181,6 +169,9 @@ export class TerminalGateway
 
   @SubscribeMessage('terminal:restart')
   handleRestart(@ConnectedSocket() client: Socket): void {
+    if (!this.ensureClientAllowed(client)) {
+      return;
+    }
     try {
       this.assertTerminalEnabled();
       const cwd = this.workingDirectories.get(client.id);
@@ -196,6 +187,36 @@ export class TerminalGateway
     } catch (error) {
       this.emitError(client, error);
     }
+  }
+
+  private ensureClientAllowed(client: Socket): boolean {
+    const origin = client.handshake.headers.origin;
+    if (
+      origin !== undefined &&
+      !configuredOrigins().includes(origin)
+    ) {
+      this.emitError(
+        client,
+        new Error('Terminal origin is not allowed.'),
+      );
+      client.disconnect(true);
+      return false;
+    }
+
+    const remoteAccessEnabled =
+      process.env.TERMINAL_ALLOW_REMOTE?.toLowerCase() === 'true';
+    if (
+      !remoteAccessEnabled &&
+      !isLoopbackAddress(client.handshake.address)
+    ) {
+      this.emitError(
+        client,
+        new Error('Remote terminal connections are disabled.'),
+      );
+      client.disconnect(true);
+      return false;
+    }
+    return true;
   }
 
   private spawnSession(
@@ -306,13 +327,17 @@ export class TerminalGateway
     if (process.platform === 'win32') {
       return {
         args: ['-NoLogo'],
-        command: process.env.TERMINAL_SHELL ?? 'powershell.exe',
+        command:
+          process.env.TERMINAL_SHELL?.trim() || 'powershell.exe',
       };
     }
 
     return {
       args: [],
-      command: process.env.TERMINAL_SHELL ?? process.env.SHELL ?? '/bin/bash',
+      command:
+        process.env.TERMINAL_SHELL?.trim() ||
+        process.env.SHELL?.trim() ||
+        '/bin/bash',
     };
   }
 

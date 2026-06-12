@@ -1,11 +1,11 @@
 'use client';
 
-import { FolderOpen, TerminalSquare } from 'lucide-react';
+import { Eye, FolderOpen } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
 import { useSettingsStore } from '@/stores/settings.store';
 
-export function ProjectPathPrompt() {
+export function PreviewPathPrompt() {
   const setProjectPath = useSettingsStore(
     (state) => state.setProjectPath,
   );
@@ -14,7 +14,7 @@ export function ProjectPathPrompt() {
   );
   const [value, setValue] = useState('');
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     if (value.trim()) {
       setProjectPath(value);
@@ -29,22 +29,22 @@ export function ProjectPathPrompt() {
       >
         <div className="mb-4 flex items-start gap-3">
           <span className="rounded-md bg-accent/15 p-2 text-accent">
-            <TerminalSquare size={20} />
+            <Eye size={20} />
           </span>
           <div>
             <h2 className="text-sm font-semibold">
-              Connect the integrated terminal
+              Connect website preview
             </h2>
             <p className="mt-1 text-xs leading-5 text-muted">
-              Enter the absolute path of the folder opened in the
-              explorer. The terminal process will run from this
-              directory on your machine.
+              Use the same absolute project path as the terminal.
+              CodeFlow will run a detected dev script or serve static
+              HTML directly.
             </p>
           </div>
         </div>
         <label
           className="mb-1.5 block text-xs font-medium text-foreground"
-          htmlFor="terminal-project-path"
+          htmlFor="preview-project-path"
         >
           Project directory
         </label>
@@ -53,7 +53,7 @@ export function ProjectPathPrompt() {
           <input
             autoFocus
             className="min-w-0 flex-1 bg-transparent py-2.5 font-mono text-xs outline-none placeholder:text-muted/60"
-            id="terminal-project-path"
+            id="preview-project-path"
             onChange={(event) => setValue(event.target.value)}
             placeholder="C:\Projects\my-app"
             spellCheck={false}
@@ -61,7 +61,7 @@ export function ProjectPathPrompt() {
           />
         </div>
         <p className="mt-2 text-[11px] text-warning">
-          Commands have the same file access as the backend process.
+          Dev scripts run with the same file access as the backend.
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <button
@@ -76,7 +76,7 @@ export function ProjectPathPrompt() {
             disabled={!value.trim()}
             type="submit"
           >
-            Start terminal
+            Start preview
           </button>
         </div>
       </form>

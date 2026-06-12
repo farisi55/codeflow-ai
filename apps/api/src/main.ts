@@ -32,10 +32,14 @@ async function bootstrap(): Promise<void> {
 
   await app.register(helmetPlugin, {
     contentSecurityPolicy: false,
+    crossOriginResourcePolicy: {
+      policy: 'cross-origin',
+    },
+    frameguard: false,
   });
 
   const corsOrigin = (
-    process.env.CORS_ORIGIN ??
+    process.env.CORS_ORIGIN?.trim() ||
     'http://localhost:3000,http://127.0.0.1:3000'
   )
     .split(',')
@@ -78,6 +82,7 @@ async function bootstrap(): Promise<void> {
     `OpenCode:     POST http://localhost:${port}/ai/opencode/stream`,
   );
   logger.log(`Terminal:     WS   http://localhost:${port}/terminal`);
+  logger.log(`Preview:      WS   http://localhost:${port}/preview`);
 }
 
 void bootstrap();

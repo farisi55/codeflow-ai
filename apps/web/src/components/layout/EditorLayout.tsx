@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { Eye, TerminalSquare } from 'lucide-react';
 import {
   Panel,
   PanelGroup,
@@ -10,7 +11,9 @@ import {
 import { AIChatPanel } from '@/components/ai-chat/AIChatPanel';
 import { EditorArea } from '@/components/editor/EditorArea';
 import { FileExplorer } from '@/components/explorer/FileExplorer';
+import { PreviewPanel } from '@/components/preview/PreviewPanel';
 import { TerminalContainer } from '@/components/terminal/TerminalContainer';
+import { cn } from '@/lib/utils';
 import { useAIStore } from '@/stores/ai.store';
 import { useSettingsStore } from '@/stores/settings.store';
 
@@ -19,6 +22,10 @@ import { StatusBar } from './StatusBar';
 
 export function EditorLayout() {
   const terminalOpen = useSettingsStore((state) => state.terminalOpen);
+  const bottomPanelTab = useSettingsStore((state) => state.bottomPanelTab);
+  const setBottomPanelTab = useSettingsStore(
+    (state) => state.setBottomPanelTab,
+  );
   const toggleTerminal = useSettingsStore(
     (state) => state.toggleTerminal,
   );
@@ -51,10 +58,7 @@ export function EditorLayout() {
           className="panel-resize-handle"
         />
         <Panel className="min-h-0" defaultSize={55} minSize={30}>
-          <PanelGroup
-            className="min-h-0"
-            direction="vertical"
-          >
+          <PanelGroup className="min-h-0" direction="vertical">
             <Panel
               className="min-h-0"
               defaultSize={terminalOpen ? 68 : 100}
@@ -66,17 +70,53 @@ export function EditorLayout() {
             {terminalOpen ? (
               <>
                 <PanelResizeHandle
-                  aria-label="Resize terminal"
+                  aria-label="Resize bottom panel"
                   className="panel-resize-handle-horizontal"
                 />
                 <Panel
                   className="min-h-0"
                   defaultSize={32}
-                  id="terminal-panel"
+                  id="bottom-panel"
                   maxSize={65}
                   minSize={15}
                 >
-                  <TerminalContainer />
+                  <section className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+                    <div className="flex h-8 shrink-0 items-center border-b border-border bg-surface px-2">
+                      <button
+                        className={cn(
+                          'flex h-full items-center gap-1.5 border-b-2 px-2 text-xs',
+                          bottomPanelTab === 'terminal'
+                            ? 'border-accent text-foreground'
+                            : 'border-transparent text-muted hover:text-foreground',
+                        )}
+                        onClick={() => setBottomPanelTab('terminal')}
+                        type="button"
+                      >
+                        <TerminalSquare size={13} />
+                        Terminal
+                      </button>
+                      <button
+                        className={cn(
+                          'flex h-full items-center gap-1.5 border-b-2 px-2 text-xs',
+                          bottomPanelTab === 'preview'
+                            ? 'border-accent text-foreground'
+                            : 'border-transparent text-muted hover:text-foreground',
+                        )}
+                        onClick={() => setBottomPanelTab('preview')}
+                        type="button"
+                      >
+                        <Eye size={13} />
+                        Preview
+                      </button>
+                    </div>
+                    <div className="min-h-0 flex-1">
+                      {bottomPanelTab === 'terminal' ? (
+                        <TerminalContainer />
+                      ) : (
+                        <PreviewPanel />
+                      )}
+                    </div>
+                  </section>
                 </Panel>
               </>
             ) : null}
