@@ -45,31 +45,31 @@ function TabButton({
 }
 
 export function BottomPanel() {
-  const activeBottomTab = useSettingsStore(
-    (state) => state.activeBottomTab,
+  const bottomPanelTab = useSettingsStore(
+    (state) => state.bottomPanelTab,
   );
-  const setBottomTab = useSettingsStore(
-    (state) => state.setBottomTab,
+  const setBottomPanelTab = useSettingsStore(
+    (state) => state.setBottomPanelTab,
   );
   const toggleBottomPanel = useSettingsStore(
     (state) => state.toggleBottomPanel,
   );
 
   const selectTab = (tab: BottomPanelTab): void => {
-    setBottomTab(tab);
+    setBottomPanelTab(tab);
   };
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-background">
       <div className="flex h-7 shrink-0 items-center border-b border-border bg-surface">
         <TabButton
-          active={activeBottomTab === 'terminal'}
+          active={bottomPanelTab === 'terminal'}
           icon={TerminalSquare}
           label="Terminal"
           onClick={() => selectTab('terminal')}
         />
         <TabButton
-          active={activeBottomTab === 'preview'}
+          active={bottomPanelTab === 'preview'}
           icon={Eye}
           label="Preview"
           onClick={() => selectTab('preview')}
@@ -77,7 +77,7 @@ export function BottomPanel() {
         <button
           aria-label="Close bottom panel"
           className="ml-auto mr-2 rounded p-1 text-muted hover:bg-surface-2 hover:text-foreground"
-          onClick={toggleBottomPanel}
+          onClick={() => toggleBottomPanel(bottomPanelTab)}
           title="Close panel"
           type="button"
         >
@@ -85,7 +85,7 @@ export function BottomPanel() {
         </button>
       </div>
       <div className="min-h-0 flex-1">
-        {activeBottomTab === 'terminal' ? (
+        {bottomPanelTab === 'terminal' ? (
           <TerminalContainer />
         ) : (
           <PreviewContainer />

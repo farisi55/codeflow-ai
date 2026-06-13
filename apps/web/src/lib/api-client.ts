@@ -44,7 +44,9 @@ export const apiClient = {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(request),
-        signal: AbortSignal.timeout(30000),
+        signal: AbortSignal.timeout(
+          request.promptOptimize ? 120000 : 30000,
+        ),
       });
       if (!response.ok || !response.body) {
         return null;
@@ -70,7 +72,9 @@ export const apiClient = {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(request),
-        signal: AbortSignal.timeout(130000),
+        signal: AbortSignal.timeout(
+          request.promptOptimize ? 250000 : 130000,
+        ),
       });
       if (!response.ok || !response.body) {
         return null;

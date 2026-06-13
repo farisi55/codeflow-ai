@@ -66,7 +66,7 @@ export function PreviewPathPrompt() {
         <div className="mt-5 flex justify-end gap-2">
           <button
             className="rounded-md border border-border px-3 py-1.5 text-xs text-muted hover:bg-surface-2 hover:text-foreground"
-            onClick={toggleBottomPanel}
+            onClick={() => toggleBottomPanel('preview')}
             type="button"
           >
             Cancel

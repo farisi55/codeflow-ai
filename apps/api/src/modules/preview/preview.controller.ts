@@ -22,12 +22,20 @@ interface PreviewParams {
   '*': string;
 }
 
+interface CreatePreviewSessionResponse {
+  id: string;
+  root: string;
+  url: string;
+}
+
 @Controller('preview')
 export class PreviewController {
   constructor(private readonly previewService: PreviewService) {}
 
   @Post('session')
-  createSession(@Body() body: CreatePreviewSessionBody) {
+  createSession(
+    @Body() body: CreatePreviewSessionBody,
+  ): CreatePreviewSessionResponse {
     try {
       const session = this.previewService.createSession(body?.projectPath);
       return {

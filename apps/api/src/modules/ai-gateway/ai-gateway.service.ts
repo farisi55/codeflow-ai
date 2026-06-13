@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { ServerResponse } from 'node:http';
 
+import { PromptOptimizerService } from '../prompt-optimizer/prompt-optimizer.service';
 import { SkillsService } from '../skills/skills.service';
 import { WebSearchService } from '../web-search/web-search.service';
 import type { AIStreamDto } from './dto/ai-stream.dto';
@@ -76,6 +77,7 @@ export class AIGatewayService {
     private readonly fallback: FallbackService,
     private readonly skills: SkillsService,
     private readonly webSearch: WebSearchService,
+    private readonly promptOptimizer: PromptOptimizerService,
     groq: GroqProvider,
     gemini: GeminiProvider,
     mistral: MistralProvider,
@@ -115,9 +117,25 @@ export class AIGatewayService {
     response.once('close', () => abortController.abort());
 
     try {
-      const skill = this.skills.detectSkill(dto.content);
+      let effectiveContent = dto.content;
+      if (dto.promptOptimize) {
+        const optimized = await this.promptOptimizer.optimize(
+          {
+            content: dto.content,
+            activeFile: dto.activeFile,
+            fileOperation: dto.fileOperation,
+          },
+          send,
+          abortController.signal,
+        );
+        if (optimized) {
+          effectiveContent = optimized.optimizedPrompt;
+        }
+      }
+
+      const skill = this.skills.detectSkill(effectiveContent);
       const baseSystemPrompt = skill
-        ? skill.getSystemPrompt(dto.content)
+        ? skill.getSystemPrompt(effectiveContent)
         : DEFAULT_SYSTEM_PROMPT;
       const isCreateOperation = dto.fileOperation?.type === 'create';
       const isMultiFileOperation =
@@ -129,7 +147,11 @@ export class AIGatewayService {
           : dto.activeFile
             ? ACTIVE_FILE_EDIT_PROMPT
             : '';
-      const webContext = await this.getWebContext(dto.content, send);
+      const webContext = await this.getWebContext(
+        dto.content,
+        effectiveContent,
+        send,
+      );
       const webPrompt = webContext
         ? [
             'Web browsing is available through CodeFlow AI.',
@@ -148,8 +170,8 @@ export class AIGatewayService {
         .join('\n\n');
       const userContent =
         dto.activeFile || isCreateOperation
-          ? this.buildFileRequest(dto)
-          : dto.content;
+          ? this.buildFileRequest(dto, effectiveContent)
+          : effectiveContent;
       const messages: ProviderMessage[] = [
         { role: 'system', content: systemPrompt },
         ...dto.context.map((message) => ({
@@ -159,7 +181,7 @@ export class AIGatewayService {
         { role: 'user', content: userContent },
       ];
       const providerOrder = this.taskRouter.getProviderOrder(
-        dto.content,
+        effectiveContent,
         dto.provider,
       );
       const { stream, providerId, modelId } =
@@ -291,10 +313,15 @@ export class AIGatewayService {
   }
 
   private async getWebContext(
-    userRequest: string,
+    originalRequest: string,
+    searchQuery: string,
     send: (chunk: object) => void,
   ): Promise<string> {
-    if (!this.webSearch.shouldBrowse(userRequest)) {
+    const shouldBrowse =
+      this.webSearch.shouldBrowse(originalRequest) ||
+      this.webSearch.shouldBrowse(searchQuery);
+
+    if (!shouldBrowse) {
       return '';
     }
 
@@ -311,10 +338,10 @@ export class AIGatewayService {
     send({
       type: 'web_search',
       status: 'searching',
-      query: userRequest,
+      query: searchQuery,
     });
 
-    const result = await this.webSearch.search(userRequest);
+    const result = await this.webSearch.search(searchQuery);
     if (!result) {
       send({
         type: 'web_search',
@@ -337,11 +364,14 @@ export class AIGatewayService {
     return this.webSearch.formatForPrompt(result);
   }
 
-  private buildFileRequest(dto: AIStreamDto): string {
+  private buildFileRequest(
+    dto: AIStreamDto,
+    content: string,
+  ): string {
     const activeFile = dto.activeFile;
 
     return [
-      `User request: ${dto.content}`,
+      `User request: ${content}`,
       ...(dto.fileOperation?.type === 'create'
         ? [
             `Requested operation: ${

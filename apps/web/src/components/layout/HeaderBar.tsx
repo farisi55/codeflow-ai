@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot, Settings, Zap } from 'lucide-react';
+import { Bot, Settings, Sparkles, Zap } from 'lucide-react';
 import { useEffect } from 'react';
 
 import { ModelSelector } from '@/components/ai-chat/ModelSelector';
@@ -38,6 +38,12 @@ export function HeaderBar() {
   const toggleOpenCode = useSettingsStore(
     (state) => state.toggleOpenCode,
   );
+  const promptOptimizeEnabled = useSettingsStore(
+    (state) => state.promptOptimizeEnabled,
+  );
+  const togglePromptOptimize = useSettingsStore(
+    (state) => state.togglePromptOptimize,
+  );
 
   useEffect(() => {
     void useSettingsStore.persist.rehydrate();
@@ -52,6 +58,23 @@ export function HeaderBar() {
       <div className="flex items-center gap-3">
         <ProviderSelector />
         <ModelSelector />
+        <button
+          className={
+            promptOptimizeEnabled
+              ? 'flex items-center gap-1 rounded border border-warning bg-[rgba(210,153,34,0.15)] px-2 py-1 text-[11px] font-medium text-warning transition-all'
+              : 'flex items-center gap-1 rounded border border-border bg-surface-2 px-2 py-1 text-[11px] font-medium text-muted transition-all hover:text-foreground'
+          }
+          onClick={togglePromptOptimize}
+          title={
+            promptOptimizeEnabled
+              ? 'Prompt Optimizer ON - requests are analyzed and rewritten before sending. Click to disable.'
+              : 'Prompt Optimizer OFF - click to analyze and rewrite prompts before sending. This adds two AI calls.'
+          }
+          type="button"
+        >
+          <Sparkles size={11} />
+          {promptOptimizeEnabled ? 'Optimize: On' : 'Optimize'}
+        </button>
         <button
           className={
             openCodeEnabled

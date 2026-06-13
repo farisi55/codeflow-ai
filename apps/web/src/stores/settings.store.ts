@@ -13,9 +13,11 @@ interface SettingsState {
   bottomPanelTab: BottomPanelTab;
   openCodeEnabled: boolean;
   projectPath: string;
+  promptOptimizeEnabled: boolean;
   terminalOpen: boolean;
   toggleAutoApply: () => void;
   toggleOpenCode: () => void;
+  togglePromptOptimize: () => void;
   toggleTerminal: () => void;
   setAutoApply: (value: boolean) => void;
   setBottomPanelTab: (value: BottomPanelTab) => void;
@@ -32,6 +34,7 @@ type PersistedSettingsState = Partial<
     | 'bottomPanelTab'
     | 'openCodeEnabled'
     | 'projectPath'
+    | 'promptOptimizeEnabled'
     | 'terminalOpen'
   >
 >;
@@ -47,6 +50,7 @@ export const useSettingsStore = create<SettingsState>()(
       bottomPanelTab: 'terminal',
       openCodeEnabled: false,
       projectPath: '',
+      promptOptimizeEnabled: false,
       terminalOpen: false,
 
       toggleAutoApply: () => {
@@ -56,6 +60,12 @@ export const useSettingsStore = create<SettingsState>()(
       toggleOpenCode: () => {
         set((state) => ({
           openCodeEnabled: !state.openCodeEnabled,
+        }));
+      },
+
+      togglePromptOptimize: () => {
+        set((state) => ({
+          promptOptimizeEnabled: !state.promptOptimizeEnabled,
         }));
       },
 
@@ -107,9 +117,10 @@ export const useSettingsStore = create<SettingsState>()(
         bottomPanelTab: state.bottomPanelTab,
         openCodeEnabled: state.openCodeEnabled,
         projectPath: state.projectPath,
+        promptOptimizeEnabled: state.promptOptimizeEnabled,
         terminalOpen: state.terminalOpen,
       }),
-      version: 2,
+      version: 3,
       migrate: (persistedState) => {
         const state = persistedState as PersistedSettingsState | undefined;
 
@@ -129,6 +140,10 @@ export const useSettingsStore = create<SettingsState>()(
             typeof state?.projectPath === 'string'
               ? state.projectPath
               : '',
+          promptOptimizeEnabled:
+            typeof state?.promptOptimizeEnabled === 'boolean'
+              ? state.promptOptimizeEnabled
+              : false,
           terminalOpen:
             typeof state?.terminalOpen === 'boolean'
               ? state.terminalOpen

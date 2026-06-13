@@ -14,7 +14,7 @@ export function ProjectPathPrompt() {
   );
   const [value, setValue] = useState('');
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     if (value.trim()) {
       setProjectPath(value);
@@ -66,7 +66,7 @@ export function ProjectPathPrompt() {
         <div className="mt-5 flex justify-end gap-2">
           <button
             className="rounded-md border border-border px-3 py-1.5 text-xs text-muted hover:bg-surface-2 hover:text-foreground"
-            onClick={toggleBottomPanel}
+            onClick={() => toggleBottomPanel('terminal')}
             type="button"
           >
             Cancel

@@ -15,6 +15,7 @@ import { tmpdir } from 'os';
 import { delimiter, join } from 'path';
 import type { Readable } from 'stream';
 
+import { PromptOptimizerService } from '../prompt-optimizer/prompt-optimizer.service';
 import { WebSearchService } from '../web-search/web-search.service';
 
 export interface OpenFileContext {
@@ -44,6 +45,7 @@ export interface OpenCodeChatParams {
   autoApply?: boolean;
   context?: OpenCodeContextMessage[];
   webContext?: string;
+  promptOptimize?: boolean;
 }
 
 interface OpenCodeJsonEvent {
@@ -78,6 +80,7 @@ export class OpenCodeService {
   constructor(
     private readonly config: ConfigService,
     private readonly webSearch: WebSearchService,
+    private readonly promptOptimizer: PromptOptimizerService,
   ) {
     const configuredTimeout = Number.parseInt(
       this.config.get<string>('OPENCODE_TIMEOUT_MS') ?? '',
@@ -204,8 +207,47 @@ export class OpenCodeService {
     }
 
     mkdirSync(this.workingDirectory, { recursive: true });
-    const webContext = await this.getWebContext(params.content, response);
-    const prompt = this.buildPrompt({ ...params, webContext });
+    let effectiveContent = params.content;
+
+    if (params.promptOptimize) {
+      const optimizerAbort = new AbortController();
+      const stopOptimizer = (): void => optimizerAbort.abort();
+      response.once('close', stopOptimizer);
+
+      try {
+        const optimized = await this.promptOptimizer.optimize(
+          {
+            content: params.content,
+            projectName: params.projectName,
+            activeFile: params.activeFile,
+            fileOperation: params.fileOperation,
+            filePaths: params.filePaths,
+          },
+          (chunk) => this.send(response, chunk),
+          optimizerAbort.signal,
+        );
+        if (optimized) {
+          effectiveContent = optimized.optimizedPrompt;
+        }
+      } finally {
+        response.off('close', stopOptimizer);
+      }
+
+      if (response.writableEnded || response.destroyed) {
+        return;
+      }
+    }
+
+    const webContext = await this.getWebContext(
+      params.content,
+      effectiveContent,
+      response,
+    );
+    const prompt = this.buildPrompt({
+      ...params,
+      content: effectiveContent,
+      webContext,
+    });
     this.logger.log(
       `Running OpenCode with injected context for project "${params.projectName || 'untitled'}" (${prompt.length} characters)`,
     );
@@ -353,10 +395,15 @@ export class OpenCodeService {
   }
 
   private async getWebContext(
-    userRequest: string,
+    originalRequest: string,
+    searchQuery: string,
     response: ServerResponse,
   ): Promise<string> {
-    if (!this.webSearch.shouldBrowse(userRequest)) {
+    const shouldBrowse =
+      this.webSearch.shouldBrowse(originalRequest) ||
+      this.webSearch.shouldBrowse(searchQuery);
+
+    if (!shouldBrowse) {
       return '';
     }
 
@@ -373,10 +420,10 @@ export class OpenCodeService {
     this.send(response, {
       type: 'web_search',
       status: 'searching',
-      query: userRequest,
+      query: searchQuery,
     });
 
-    const result = await this.webSearch.search(userRequest);
+    const result = await this.webSearch.search(searchQuery);
     if (!result) {
       this.send(response, {
         type: 'web_search',

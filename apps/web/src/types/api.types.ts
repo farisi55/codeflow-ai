@@ -37,6 +37,7 @@ export interface AIStreamRequest {
   activeFile?: AIActiveFileContext;
   fileOperation?: AIFileOperation;
   autoApply?: boolean;
+  promptOptimize?: boolean;
   context: Array<{
     role: 'user' | 'assistant';
     content: string;
@@ -57,6 +58,7 @@ export interface OpenCodeStreamRequest {
   filePaths: string[];
   fileOperation?: AIFileOperation;
   autoApply?: boolean;
+  promptOptimize?: boolean;
   context: Array<{
     role: 'user' | 'assistant';
     content: string;
@@ -70,14 +72,27 @@ export interface OpenCodeHealthResponse {
 }
 
 export interface AIStreamChunk {
-  type: 'chunk' | 'done' | 'error' | 'web_search';
+  type:
+    | 'chunk'
+    | 'done'
+    | 'error'
+    | 'web_search'
+    | 'prompt_optimize';
   content?: string;
   provider?: string;
   model?: string;
   error?: string;
-  status?: 'searching' | 'done' | 'failed' | 'skipped';
+  status?:
+    | 'searching'
+    | 'done'
+    | 'failed'
+    | 'skipped'
+    | 'running';
   query?: string;
   reason?: string;
+  stage?: 'analysis' | 'engineering';
+  preview?: string;
+  optimizedPrompt?: string;
   results?: Array<{
     title: string;
     url: string;

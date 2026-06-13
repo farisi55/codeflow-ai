@@ -87,6 +87,10 @@ class OpenCodeStreamDto {
   @IsOptional()
   autoApply = false;
 
+  @IsBoolean()
+  @IsOptional()
+  promptOptimize = false;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => OpenCodeContextMessageDto)

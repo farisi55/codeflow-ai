@@ -223,6 +223,51 @@ function formatWebSearchStatus(chunk: AIStreamChunk): string {
   return '';
 }
 
+function sanitizeForChat(text: string): string {
+  return text.split('```').join('`\u200b``');
+}
+
+function formatPromptOptimizeStatus(
+  chunk: AIStreamChunk,
+): string {
+  if (chunk.type !== 'prompt_optimize') {
+    return '';
+  }
+
+  if (chunk.stage === 'analysis') {
+    if (chunk.status === 'running') {
+      return 'Analyzing requirements (fullstack, backend, UI/UX)...';
+    }
+    if (chunk.status === 'failed') {
+      return `Prompt analysis skipped: ${
+        chunk.reason ?? 'unknown error'
+      }`;
+    }
+    return '';
+  }
+
+  if (chunk.stage === 'engineering') {
+    if (chunk.status === 'running') {
+      return 'Optimizing prompt for code generation...';
+    }
+    if (chunk.status === 'failed') {
+      return `Prompt rewrite skipped: ${
+        chunk.reason ?? 'unknown error'
+      }`;
+    }
+    if (chunk.status === 'done' && chunk.optimizedPrompt) {
+      const quoted = sanitizeForChat(chunk.optimizedPrompt)
+        .split('\n')
+        .map((line) => `> ${line}`)
+        .join('\n');
+      return ['Prompt optimized:', quoted].join('\n');
+    }
+    return 'Prompt optimized';
+  }
+
+  return '';
+}
+
 export const useAIStore = create<AIState>((set, get) => ({
   messages: [],
   isLoading: false,
@@ -291,6 +336,8 @@ export const useAIStore = create<AIState>((set, get) => ({
     const selectedModel = initialState.selectedModel;
     const openCodeEnabled =
       useSettingsStore.getState().openCodeEnabled;
+    const promptOptimizeEnabled =
+      useSettingsStore.getState().promptOptimizeEnabled;
     activeOperationId = operationId;
 
     set((state) => ({
@@ -304,6 +351,7 @@ export const useAIStore = create<AIState>((set, get) => ({
     const shouldUsePuter =
       !requiresBackendBrowsing &&
       !openCodeEnabled &&
+      !promptOptimizeEnabled &&
       (selectedProvider === 'puter' || selectedProvider === 'auto') &&
       puterClient.isLoaded() &&
       puterClient.isSignedIn();
@@ -410,6 +458,7 @@ export const useAIStore = create<AIState>((set, get) => ({
         filePaths: flattenFileTree(explorerState.fileTree),
         fileOperation: options.fileOperation,
         autoApply: options.autoApply,
+        promptOptimize: promptOptimizeEnabled,
         context,
       });
     } else {
@@ -420,6 +469,7 @@ export const useAIStore = create<AIState>((set, get) => ({
         activeFile: options.activeFile,
         fileOperation: options.fileOperation,
         autoApply: options.autoApply,
+        promptOptimize: promptOptimizeEnabled,
         context,
       });
     }
@@ -440,6 +490,7 @@ export const useAIStore = create<AIState>((set, get) => ({
       const decoder = new TextDecoder();
       let bufferedText = '';
       let receivedContent = false;
+      let hasActivityStatus = false;
 
       try {
         streamLoop: while (true) {
@@ -460,6 +511,8 @@ export const useAIStore = create<AIState>((set, get) => ({
             }
 
             if (chunk.type === 'chunk' && chunk.content) {
+              const separator =
+                !receivedContent && hasActivityStatus ? '\n\n' : '';
               receivedContent = true;
               set((state) => ({
                 ...state,
@@ -467,7 +520,8 @@ export const useAIStore = create<AIState>((set, get) => ({
                   message.id === assistantMessage.id
                     ? {
                         ...message,
-                        content: message.content + chunk.content,
+                        content:
+                          message.content + separator + chunk.content,
                       }
                     : message,
                 ),
@@ -475,9 +529,33 @@ export const useAIStore = create<AIState>((set, get) => ({
               continue;
             }
 
+            if (chunk.type === 'prompt_optimize') {
+              const statusText =
+                formatPromptOptimizeStatus(chunk);
+              if (statusText) {
+                hasActivityStatus = true;
+                set((state) => ({
+                  ...state,
+                  messages: state.messages.map((message) =>
+                    message.id === assistantMessage.id
+                      ? {
+                          ...message,
+                          content:
+                            message.content.length > 0
+                              ? `${message.content}\n\n${statusText}`
+                              : statusText,
+                        }
+                      : message,
+                  ),
+                }));
+              }
+              continue;
+            }
+
             if (chunk.type === 'web_search') {
               const statusText = formatWebSearchStatus(chunk);
               if (statusText) {
+                hasActivityStatus = true;
                 set((state) => ({
                   ...state,
                   messages: state.messages.map((message) =>
