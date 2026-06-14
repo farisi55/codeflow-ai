@@ -36,7 +36,6 @@ import { useSettingsStore } from '@/stores/settings.store';
 
 import { ChatMessage } from './ChatMessage';
 import { OpenCodeStatusBanner } from './OpenCodeStatusBanner';
-import { PuterAuthBanner } from './PuterAuthBanner';
 
 interface Notification {
   type: 'success' | 'error';
@@ -56,9 +55,6 @@ export function AIChatPanel() {
   const isLoading = useAIStore((state) => state.isLoading);
   const sendMessage = useAIStore((state) => state.sendMessage);
   const clearMessages = useAIStore((state) => state.clearMessages);
-  const selectedProvider = useAIStore(
-    (state) => state.selectedProvider,
-  );
   const autoApply = useSettingsStore((state) => state.autoApply);
   const openCodeEnabled = useSettingsStore(
     (state) => state.openCodeEnabled,
@@ -443,9 +439,13 @@ export function AIChatPanel() {
       ) ?? undefined;
 
     const fileOperation = detectCreateFileIntent(input);
+    const requestsDiffReview =
+      /\b(diff|review|preview)\b[\s\S]{0,40}\b(before|sebelum)\b[\s\S]{0,20}\b(apply|terapkan)\b|\b(tampilkan|show)\b[\s\S]{0,30}\bdiff\b/i.test(
+        input,
+      );
 
     void sendMessage(input, {
-      autoApply,
+      autoApply: autoApply && !requestsDiffReview,
       fileOperation: fileOperation ?? undefined,
       activeFile: activeFile
         ? {
@@ -494,11 +494,6 @@ export function AIChatPanel() {
       </div>
 
       {openCodeEnabled ? <OpenCodeStatusBanner /> : null}
-
-      {!openCodeEnabled &&
-      (selectedProvider === 'puter' || selectedProvider === 'auto') ? (
-        <PuterAuthBanner alwaysShow={selectedProvider === 'puter'} />
-      ) : null}
 
       {notification ? (
         <div

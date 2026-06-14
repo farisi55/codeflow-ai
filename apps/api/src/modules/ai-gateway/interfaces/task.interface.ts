@@ -17,7 +17,6 @@ export const TASK_PROVIDER_MAP: Record<TaskType, string[]> = {
     'gemini',
     'mistral',
     'openrouter',
-    'puter',
     'ollama',
   ],
   [TaskType.REFACTOR]: [
@@ -27,13 +26,11 @@ export const TASK_PROVIDER_MAP: Record<TaskType, string[]> = {
     'sambanova',
     'mistral',
     'openrouter',
-    'puter',
     'ollama',
   ],
   [TaskType.QUICK_QUESTION]: [
     'groq',
     'sambanova',
-    'puter',
     'zai',
     'gemini',
     'mistral',
@@ -42,7 +39,6 @@ export const TASK_PROVIDER_MAP: Record<TaskType, string[]> = {
   ],
   [TaskType.ARCHITECTURE]: [
     'zai',
-    'puter',
     'gemini',
     'openrouter',
     'sambanova',
@@ -57,12 +53,10 @@ export const TASK_PROVIDER_MAP: Record<TaskType, string[]> = {
     'sambanova',
     'groq',
     'openrouter',
-    'puter',
     'ollama',
   ],
   [TaskType.LARGE_CONTEXT]: [
     'zai',
-    'puter',
     'gemini',
     'openrouter',
     'sambanova',
@@ -77,11 +71,9 @@ export const TASK_PROVIDER_MAP: Record<TaskType, string[]> = {
     'sambanova',
     'mistral',
     'openrouter',
-    'puter',
     'ollama',
   ],
   [TaskType.GENERAL]: [
-    'puter',
     'sambanova',
     'groq',
     'zai',
@@ -93,7 +85,6 @@ export const TASK_PROVIDER_MAP: Record<TaskType, string[]> = {
 };
 
 export const GLOBAL_FALLBACK_CHAIN: string[] = [
-  'puter',
   'groq',
   'sambanova',
   'zai',

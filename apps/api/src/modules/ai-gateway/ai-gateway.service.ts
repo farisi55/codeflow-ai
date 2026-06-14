@@ -16,7 +16,6 @@ import { GroqProvider } from './providers/groq.provider';
 import { MistralProvider } from './providers/mistral.provider';
 import { OllamaProvider } from './providers/ollama.provider';
 import { OpenRouterProvider } from './providers/openrouter.provider';
-import { PuterProvider } from './providers/puter.provider';
 import { SambaNovaProvider } from './providers/sambanova.provider';
 import { ZaiProvider } from './providers/zai.provider';
 import { FallbackService } from './routing/fallback.service';
@@ -50,11 +49,14 @@ The code block can be created directly in the project, so it must contain only t
 
 const CREATE_MULTIPLE_FILES_PROMPT = `The user requested creation of multiple files.
 - Return every requested file with its complete contents.
-- Before each code block, write the relative path as a bold label, for example: **src/index.html**
+- Begin the multi-file section with \`\`\`files.
+- Immediately before each code block, write FILE: relative/path.ext on its own line.
 - Put each file in its own fenced markdown code block and label it with the language.
+- End the multi-file section with a final \`\`\` line.
+- For a browser app, use index.html, style.css, and script.js. The entry file is index.html.
 - Do not omit files, use placeholders, or combine multiple files in one code block.
 - Include the active reference file as a labeled file when it is part of the requested project changes.
-CodeFlow AI will create or update every labeled file.`;
+CodeFlow AI parses each FILE: path.ext block separately. Never collapse multiple files into the active editor file.`;
 
 const PROVIDER_CATALOG_TTL_MS = 5 * 60 * 1000;
 
@@ -82,7 +84,6 @@ export class AIGatewayService {
     gemini: GeminiProvider,
     mistral: MistralProvider,
     openrouter: OpenRouterProvider,
-    puter: PuterProvider,
     sambanova: SambaNovaProvider,
     zai: ZaiProvider,
     ollama: OllamaProvider,
@@ -92,7 +93,6 @@ export class AIGatewayService {
       ['gemini', gemini],
       ['mistral', mistral],
       ['openrouter', openrouter],
-      ['puter', puter],
       ['sambanova', sambanova],
       ['zai', zai],
       ['ollama', ollama],
@@ -117,6 +117,11 @@ export class AIGatewayService {
     response.once('close', () => abortController.abort());
 
     try {
+      const webContext = await this.getWebContext(
+        dto.content,
+        dto.content,
+        send,
+      );
       let effectiveContent = dto.content;
       if (dto.promptOptimize) {
         const optimized = await this.promptOptimizer.optimize(
@@ -147,15 +152,11 @@ export class AIGatewayService {
           : dto.activeFile
             ? ACTIVE_FILE_EDIT_PROMPT
             : '';
-      const webContext = await this.getWebContext(
-        dto.content,
-        effectiveContent,
-        send,
-      );
       const webPrompt = webContext
         ? [
-            'Web browsing is available through CodeFlow AI.',
-            'When web context is provided, use it to answer current/latest/API documentation questions.',
+            'Web browsing completed before generation and the results are included below.',
+            'CRITICAL: use the web context for concrete CDN URLs, package names, imports, API methods, signatures, configuration, and versions.',
+            'If the user requested official documentation only, do not introduce facts or links from unofficial sources.',
             'Cite relevant URLs from the web context.',
             '',
             webContext,
@@ -341,7 +342,11 @@ export class AIGatewayService {
       query: searchQuery,
     });
 
-    const result = await this.webSearch.search(searchQuery);
+    const result = await this.webSearch.search(
+      searchQuery,
+      undefined,
+      this.webSearch.getSearchOptions(originalRequest),
+    );
     if (!result) {
       send({
         type: 'web_search',

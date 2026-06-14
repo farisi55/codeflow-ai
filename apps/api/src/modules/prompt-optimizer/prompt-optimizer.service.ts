@@ -9,7 +9,6 @@ import { GroqProvider } from '../ai-gateway/providers/groq.provider';
 import { MistralProvider } from '../ai-gateway/providers/mistral.provider';
 import { OllamaProvider } from '../ai-gateway/providers/ollama.provider';
 import { OpenRouterProvider } from '../ai-gateway/providers/openrouter.provider';
-import { PuterProvider } from '../ai-gateway/providers/puter.provider';
 import { SambaNovaProvider } from '../ai-gateway/providers/sambanova.provider';
 import { ZaiProvider } from '../ai-gateway/providers/zai.provider';
 import { FallbackService } from '../ai-gateway/routing/fallback.service';
@@ -54,7 +53,6 @@ const QUICK_PROVIDER_ORDER = [
   'gemini',
   'zai',
   'mistral',
-  'puter',
   'openrouter',
   'ollama',
 ];
@@ -95,7 +93,6 @@ export class PromptOptimizerService {
     gemini: GeminiProvider,
     mistral: MistralProvider,
     openrouter: OpenRouterProvider,
-    puter: PuterProvider,
     sambanova: SambaNovaProvider,
     zai: ZaiProvider,
     ollama: OllamaProvider,
@@ -105,7 +102,6 @@ export class PromptOptimizerService {
       ['gemini', gemini],
       ['mistral', mistral],
       ['openrouter', openrouter],
-      ['puter', puter],
       ['sambanova', sambanova],
       ['zai', zai],
       ['ollama', ollama],

@@ -12,6 +12,13 @@ export interface WebSearchResponse {
   provider: 'tavily' | 'firecrawl';
   query: string;
   results: WebSearchResult[];
+  officialOnly: boolean;
+  allowedDomains: string[];
+}
+
+export interface WebSearchOptions {
+  officialOnly?: boolean;
+  includeDomains?: string[];
 }
 
 interface TavilySearchItem {
@@ -39,6 +46,10 @@ interface FirecrawlResponse {
 
 const DEFAULT_MAX_RESULTS = 5;
 const DEFAULT_TIMEOUT_MS = 15_000;
+const PUTER_OFFICIAL_DOMAINS = [
+  'docs.puter.com',
+  'developer.puter.com',
+];
 
 @Injectable()
 export class WebSearchService {
@@ -73,29 +84,33 @@ export class WebSearchService {
   shouldBrowse(userRequest: string): boolean {
     const text = userRequest.toLowerCase();
     return [
-      'internet',
-      'web',
-      'browse',
-      'browsing',
-      'search',
-      'cari',
-      'mencari',
-      'google',
-      'documentation',
-      'docs',
-      'api spec',
-      'spesifikasi api',
-      'latest',
-      'terbaru',
-      'current',
-      'up to date',
-      'update terbaru',
-    ].some((keyword) => text.includes(keyword));
+      /\b(?:search|browse)\s+(?:the\s+)?(?:internet|web)\b/,
+      /\b(?:cari|jelajah|telusuri)\s+(?:di\s+)?(?:internet|web)\b/,
+      /\b(?:google|web\s+search|internet\s+search)\b/,
+      /\b(?:official\s+(?:documentation|docs|sources?)|dokumentasi\s+resmi|sumber\s+resmi)\b/,
+      /\b(?:latest|current|up[\s-]?to[\s-]?date|terbaru)\b[\s\S]{0,40}\b(?:documentation|docs|dokumentasi|api|spec|version|release)\b/,
+      /\b(?:documentation|docs|dokumentasi|api|spec|version|release)\b[\s\S]{0,40}\b(?:latest|current|up[\s-]?to[\s-]?date|terbaru)\b/,
+    ].some((pattern) => pattern.test(text));
+  }
+
+  getSearchOptions(userRequest: string): WebSearchOptions {
+    const text = userRequest.toLowerCase();
+    const officialOnly =
+      /\b(official\s+(?:documentation|docs|sources?)|only\s+official|dokumentasi\s+resmi|sumber\s+resmi|hanya\s+(?:gunakan\s+)?(?:dokumentasi|sumber)\s+resmi)\b/i.test(
+        text,
+      );
+    const includeDomains =
+      officialOnly && /\bputer(?:\.ai)?\b/i.test(text)
+        ? PUTER_OFFICIAL_DOMAINS
+        : [];
+
+    return { officialOnly, includeDomains };
   }
 
   async search(
     query: string,
     maxResults = DEFAULT_MAX_RESULTS,
+    options: WebSearchOptions = {},
   ): Promise<WebSearchResponse | null> {
     if (!this.isAvailable()) {
       return null;
@@ -103,10 +118,14 @@ export class WebSearchService {
 
     const attempts: Array<() => Promise<WebSearchResponse>> = [];
     if (this.tavilyApiKey) {
-      attempts.push(() => this.searchTavily(query, maxResults));
+      attempts.push(() =>
+        this.searchTavily(query, maxResults, options),
+      );
     }
     if (this.firecrawlApiKey) {
-      attempts.push(() => this.searchFirecrawl(query, maxResults));
+      attempts.push(() =>
+        this.searchFirecrawl(query, maxResults, options),
+      );
     }
 
     let lastError: unknown;
@@ -144,12 +163,19 @@ export class WebSearchService {
 
     const lines = [
       `Web browsing results from ${response.provider} for query: ${response.query}`,
-      'Use these results as external context. Cite URLs when using facts from them.',
+      response.officialOnly
+        ? response.allowedDomains.length > 0
+          ? `Use ONLY official sources from these domains: ${response.allowedDomains.join(', ')}.`
+          : 'Use ONLY primary official documentation and official vendor sources from the results below.'
+        : 'These results may be more recent or accurate than your training data.',
+      'For concrete technical details - CDN or package URLs, import paths, API method names, function signatures, configuration keys, and version numbers - you MUST use exactly what appears below.',
+      'Only rely on your own knowledge for details these results do not cover.',
+      'Cite the source URL(s) you used.',
       '',
       ...response.results.flatMap((result, index) => [
         `[${index + 1}] ${result.title || 'Untitled'}`,
         `URL: ${result.url}`,
-        `Content: ${this.truncate(result.content, 1_500)}`,
+        `Content: ${this.truncate(result.content, 3_000)}`,
         '',
       ]),
     ];
@@ -160,7 +186,9 @@ export class WebSearchService {
   private async searchTavily(
     query: string,
     maxResults: number,
+    options: WebSearchOptions,
   ): Promise<WebSearchResponse> {
+    const includeDomains = options.includeDomains ?? [];
     const response = await this.fetchWithTimeout(
       'https://api.tavily.com/search',
       {
@@ -173,8 +201,11 @@ export class WebSearchService {
           query,
           search_depth: 'advanced',
           include_answer: false,
-          include_raw_content: false,
+          include_raw_content: true,
           max_results: maxResults,
+          ...(includeDomains.length > 0
+            ? { include_domains: includeDomains }
+            : {}),
         }),
       },
     );
@@ -184,23 +215,39 @@ export class WebSearchService {
     }
 
     const json = (await response.json()) as TavilyResponse;
-    const results = (json.results ?? [])
-      .map((item) => ({
-        title: item.title ?? 'Untitled',
-        url: item.url ?? '',
-        content: item.content ?? item.raw_content ?? '',
-        source: 'tavily' as const,
-      }))
-      .filter((item) => item.url && item.content)
-      .slice(0, maxResults);
+    const results = this.filterAndSortResults(
+      (json.results ?? [])
+        .map((item) => ({
+          title: item.title ?? 'Untitled',
+          url: item.url ?? '',
+          content: item.raw_content ?? item.content ?? '',
+          source: 'tavily' as const,
+        }))
+        .filter((item) => item.url && item.content),
+      options,
+    ).slice(0, maxResults);
 
-    return { provider: 'tavily', query, results };
+    return {
+      provider: 'tavily',
+      query,
+      results,
+      officialOnly: options.officialOnly === true,
+      allowedDomains: includeDomains,
+    };
   }
 
   private async searchFirecrawl(
     query: string,
     maxResults: number,
+    options: WebSearchOptions,
   ): Promise<WebSearchResponse> {
+    const includeDomains = options.includeDomains ?? [];
+    const scopedQuery =
+      includeDomains.length > 0
+        ? `${query} ${includeDomains
+            .map((domain) => `site:${domain}`)
+            .join(' OR ')}`
+        : query;
     const response = await this.fetchWithTimeout(
       'https://api.firecrawl.dev/v1/search',
       {
@@ -210,7 +257,7 @@ export class WebSearchService {
           Authorization: `Bearer ${this.firecrawlApiKey}`,
         },
         body: JSON.stringify({
-          query,
+          query: scopedQuery,
           limit: maxResults,
           scrapeOptions: {
             formats: ['markdown'],
@@ -224,18 +271,67 @@ export class WebSearchService {
     }
 
     const json = (await response.json()) as FirecrawlResponse;
-    const results = (json.data ?? [])
-      .map((item) => ({
-        title: item.title ?? 'Untitled',
-        url: item.url ?? '',
-        content:
-          item.markdown ?? item.content ?? item.description ?? '',
-        source: 'firecrawl' as const,
-      }))
-      .filter((item) => item.url && item.content)
-      .slice(0, maxResults);
+    const results = this.filterAndSortResults(
+      (json.data ?? [])
+        .map((item) => ({
+          title: item.title ?? 'Untitled',
+          url: item.url ?? '',
+          content:
+            item.markdown ?? item.content ?? item.description ?? '',
+          source: 'firecrawl' as const,
+        }))
+        .filter((item) => item.url && item.content),
+      options,
+    ).slice(0, maxResults);
 
-    return { provider: 'firecrawl', query, results };
+    return {
+      provider: 'firecrawl',
+      query,
+      results,
+      officialOnly: options.officialOnly === true,
+      allowedDomains: includeDomains,
+    };
+  }
+
+  private filterAndSortResults(
+    results: WebSearchResult[],
+    options: WebSearchOptions,
+  ): WebSearchResult[] {
+    const includeDomains = options.includeDomains ?? [];
+    if (includeDomains.length === 0) {
+      return results;
+    }
+
+    return results
+      .filter((result) => {
+        try {
+          const hostname = new URL(result.url).hostname.toLowerCase();
+          return includeDomains.some(
+            (domain) =>
+              hostname === domain || hostname.endsWith(`.${domain}`),
+          );
+        } catch {
+          return false;
+        }
+      })
+      .sort((left, right) => {
+        const leftRank = this.domainRank(left.url, includeDomains);
+        const rightRank = this.domainRank(right.url, includeDomains);
+        return leftRank - rightRank;
+      });
+  }
+
+  private domainRank(url: string, domains: string[]): number {
+    try {
+      const hostname = new URL(url).hostname.toLowerCase();
+      const rank = domains.findIndex(
+        (domain) =>
+          hostname === domain || hostname.endsWith(`.${domain}`),
+      );
+      return rank === -1 ? domains.length : rank;
+    } catch {
+      return domains.length;
+    }
   }
 
   private async fetchWithTimeout(

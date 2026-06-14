@@ -22,8 +22,19 @@ const FILENAME_PATTERNS: RegExp[] = [
   /^#{1,4}\s+([\w\-./\\]+\.\w+)\s*:?\s*$/,
   /^`([\w\-./\\]+\.\w+)`\s*:?\s*$/,
   /^(?:file(?:name)?|path)\s*:\s*([\w\-./\\]+\.\w+)\s*$/i,
+  /^<!--\s*([\w\-./\\]+\.\w+)\s*-->$/,
+  /^\/\*\s*([\w\-./\\]+\.\w+)\s*\*\/$/,
+  /^\/\/\s*([\w\-./\\]+\.\w+)\s*$/,
   /^([\w\-./\\]+\.\w+)$/,
+  /[(`]\s*(?:di\s+file\s+|in\s+file\s+|file\s*:?\s*)?([\w\-./\\]+\.\w{1,8})\s*[)`]/i,
 ];
+
+const DEFAULT_FILENAMES_BY_LANGUAGE: Record<string, string> = {
+  html: 'index.html',
+  css: 'style.css',
+  javascript: 'script.js',
+  js: 'script.js',
+};
 
 const DELETE_PATTERNS: Array<{
   pattern: RegExp;
@@ -74,8 +85,9 @@ export function extractFileBlocks(markdown: string): FileBlock[] {
   const regex = /```([^\r\n`]*)\r?\n?([\s\S]*?)```/g;
   let match: RegExpExecArray | null;
   let cursor = 0;
+  const normalizedMarkdown = unwrapFilesEnvelope(markdown);
 
-  while ((match = regex.exec(markdown)) !== null) {
+  while ((match = regex.exec(normalizedMarkdown)) !== null) {
     const language =
       match[1]?.trim().split(/\s+/)[0] || 'plaintext';
     const code = match[2] ?? '';
@@ -84,9 +96,10 @@ export function extractFileBlocks(markdown: string): FileBlock[] {
       .filter((line) => line.trim().length > 0).length;
 
     blocks.push({
-      filename: detectFilename(
-        markdown.slice(cursor, match.index),
-      ),
+      filename:
+        detectFilename(
+          normalizedMarkdown.slice(cursor, match.index),
+        ) ?? detectFilenameFromCode(code),
       language,
       code,
       lineCount,
@@ -99,7 +112,49 @@ export function extractFileBlocks(markdown: string): FileBlock[] {
 }
 
 export function getNamedFileBlocks(markdown: string): FileBlock[] {
-  const namedBlocks = extractFileBlocks(markdown).filter(
+  const allBlocks = extractFileBlocks(markdown);
+  const explicitlyNamed = allBlocks.filter(
+    (block) => block.filename !== null && block.lineCount > 0,
+  );
+  const supportedUnnamed = allBlocks.filter(
+    (block) =>
+      block.filename === null &&
+      block.lineCount > 0 &&
+      DEFAULT_FILENAMES_BY_LANGUAGE[
+        block.language.toLowerCase()
+      ] !== undefined,
+  );
+  const shouldInferDefaults =
+    explicitlyNamed.length > 0 ||
+    (allBlocks.length > 1 && supportedUnnamed.length > 1);
+  let candidateBlocks = allBlocks;
+
+  if (shouldInferDefaults) {
+    const usedNames = new Set(
+      explicitlyNamed.map((block) =>
+        block.filename!.toLowerCase(),
+      ),
+    );
+
+    candidateBlocks = allBlocks.map((block) => {
+      if (block.filename !== null || block.lineCount === 0) {
+        return block;
+      }
+
+      const defaultName =
+        DEFAULT_FILENAMES_BY_LANGUAGE[
+          block.language.toLowerCase()
+        ];
+      if (!defaultName || usedNames.has(defaultName.toLowerCase())) {
+        return block;
+      }
+
+      usedNames.add(defaultName.toLowerCase());
+      return { ...block, filename: defaultName };
+    });
+  }
+
+  const namedBlocks = candidateBlocks.filter(
     (block) => block.filename !== null && block.lineCount > 0,
   );
   const result: FileBlock[] = [];
@@ -255,6 +310,52 @@ function detectFilename(precedingText: string): string | null {
   }
 
   return null;
+}
+
+function detectFilenameFromCode(code: string): string | null {
+  const lines = code
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+
+  for (const line of lines) {
+    for (const pattern of FILENAME_PATTERNS.slice(4, 7)) {
+      const match = line.match(pattern);
+      const path = normalizeDetectedPath(match?.[1] ?? '');
+      if (path) {
+        return path;
+      }
+    }
+  }
+
+  return null;
+}
+
+function unwrapFilesEnvelope(markdown: string): string {
+  const lines = markdown.split(/\r?\n/);
+  const openingIndex = lines.findIndex((line) =>
+    /^```files\s*$/i.test(line.trim()),
+  );
+  if (openingIndex === -1) {
+    return markdown;
+  }
+
+  lines.splice(openingIndex, 1);
+  const remainingFenceIndexes = lines
+    .map((line, index) =>
+      /^```/.test(line.trim()) ? index : -1,
+    )
+    .filter((index) => index >= openingIndex);
+
+  if (remainingFenceIndexes.length % 2 === 1) {
+    const closingIndex = remainingFenceIndexes.at(-1);
+    if (closingIndex !== undefined) {
+      lines.splice(closingIndex, 1);
+    }
+  }
+
+  return lines.join('\n');
 }
 
 function normalizeDetectedPath(path: string): string | null {

@@ -10,24 +10,17 @@ export function ProviderSelector() {
   const providerCatalog = useAIStore((state) => state.providerCatalog);
   const setProvider = useAIStore((state) => state.setProvider);
   const setModel = useAIStore((state) => state.setModel);
-  const puterOption = MOCK_PROVIDERS.find(
-    (provider) => provider.id === 'puter',
-  );
   const providers =
     providerCatalog.length > 0
       ? [
           { id: 'auto', name: 'Auto', available: true },
-          ...providerCatalog.map((provider) =>
-            provider.id === 'puter'
-              ? {
-                  ...provider,
-                  name: puterOption?.name ?? provider.name,
-                  available: true,
-                }
-              : provider,
+          ...providerCatalog.filter(
+            (provider) => provider.id !== 'puter',
           ),
         ]
-      : MOCK_PROVIDERS.map((provider) => ({
+      : MOCK_PROVIDERS.filter(
+          (provider) => provider.id !== 'puter',
+        ).map((provider) => ({
           ...provider,
           available: true,
         }));

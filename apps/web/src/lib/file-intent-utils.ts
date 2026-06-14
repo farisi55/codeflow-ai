@@ -1,15 +1,15 @@
 const LANGUAGE_TO_FILENAME: Record<string, string> = {
   html: 'index.html',
   htm: 'index.html',
-  css: 'styles.css',
+  css: 'style.css',
   scss: 'styles.scss',
   sass: 'styles.sass',
   less: 'styles.less',
   ts: 'index.ts',
   typescript: 'index.ts',
   tsx: 'Component.tsx',
-  js: 'index.js',
-  javascript: 'index.js',
+  js: 'script.js',
+  javascript: 'script.js',
   jsx: 'Component.jsx',
   py: 'main.py',
   python: 'main.py',
@@ -23,7 +23,7 @@ const LANGUAGE_TO_FILENAME: Record<string, string> = {
   csharp: 'Program.cs',
   rb: 'main.rb',
   ruby: 'main.rb',
-  php: 'index.php',
+  php: 'main.php',
   swift: 'main.swift',
   json: 'data.json',
   yaml: 'config.yml',
@@ -92,6 +92,10 @@ export function detectCreateFileIntent(
     /\b(create|make|generate|buat(?:lah|kan)?|bikin(?:kan)?|ciptakan)\b/i.test(
       prompt,
     );
+  const hasProjectBuildAction =
+    /\b(update|ubah|jadikan|build|bangun|buat(?:lah|kan)?)\b[\s\S]{0,80}\b(project|proyek|website|web\s*app|chatbot|aplikasi)\b/i.test(
+      prompt,
+    );
   const mentionsFile = /\b(file|berkas)\b/i.test(prompt);
   const mentionsNewFile =
     /\b(new|baru)\b[\s\S]{0,30}\b(file|berkas)\b|\b(file|berkas)\b[\s\S]{0,30}\b(new|baru)\b/i.test(
@@ -113,7 +117,8 @@ export function detectCreateFileIntent(
   const isMultiFileRequest =
     explicitPaths.length > 1 ||
     explicitlyMultiple ||
-    (hasDirectCreateAction && mentionedLanguages.size > 1);
+    ((hasDirectCreateAction || hasProjectBuildAction) &&
+      mentionedLanguages.size > 1);
 
   if (
     !(

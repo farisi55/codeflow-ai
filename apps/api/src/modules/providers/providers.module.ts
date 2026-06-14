@@ -6,7 +6,6 @@ import { GroqProvider } from '../ai-gateway/providers/groq.provider';
 import { MistralProvider } from '../ai-gateway/providers/mistral.provider';
 import { OllamaProvider } from '../ai-gateway/providers/ollama.provider';
 import { OpenRouterProvider } from '../ai-gateway/providers/openrouter.provider';
-import { PuterProvider } from '../ai-gateway/providers/puter.provider';
 import { SambaNovaProvider } from '../ai-gateway/providers/sambanova.provider';
 import { ZaiProvider } from '../ai-gateway/providers/zai.provider';
 import { RateLimitService } from '../ai-gateway/rate-limit/rate-limit.service';
@@ -18,7 +17,6 @@ const PROVIDERS = [
   GeminiProvider,
   MistralProvider,
   OpenRouterProvider,
-  PuterProvider,
   SambaNovaProvider,
   ZaiProvider,
   OllamaProvider,

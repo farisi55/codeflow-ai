@@ -1,11 +1,6 @@
 import { registerAs } from '@nestjs/config';
 
 export const providersConfig = registerAs('providers', () => ({
-  puter: {
-    apiKey: process.env.PUTER_API_KEY ?? '',
-    baseUrl: 'https://api.puter.com',
-    defaultModel: process.env.PUTER_DEFAULT_MODEL ?? 'gpt-4o',
-  },
   groq: {
     apiKey: process.env.GROQ_API_KEY ?? '',
     baseUrl: 'https://api.groq.com/openai/v1',

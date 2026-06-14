@@ -73,12 +73,14 @@ export class TaskRouterService {
   ): string[] {
     const taskType = this.detectTaskType(message);
     const defaultOrder = TASK_PROVIDER_MAP[taskType];
+    const backendProvider =
+      requestedProvider === 'puter' ? 'auto' : requestedProvider;
 
-    if (requestedProvider && requestedProvider !== 'auto') {
+    if (backendProvider && backendProvider !== 'auto') {
       return [
-        requestedProvider,
+        backendProvider,
         ...defaultOrder.filter(
-          (providerId) => providerId !== requestedProvider,
+          (providerId) => providerId !== backendProvider,
         ),
       ];
     }

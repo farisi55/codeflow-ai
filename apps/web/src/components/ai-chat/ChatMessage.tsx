@@ -26,9 +26,13 @@ import {
   suggestFilename,
   validateFilename,
 } from '@/lib/file-intent-utils';
+import { fsaAdapter } from '@/lib/fs';
 import { cn } from '@/lib/utils';
 import type { ChatMessage as ChatMessageData } from '@/stores/ai.store';
-import { useDiffStore } from '@/stores/diff.store';
+import {
+  type OpenDiffParams,
+  useDiffStore,
+} from '@/stores/diff.store';
 import { useEditorStore } from '@/stores/editor.store';
 import { useExplorerStore } from '@/stores/explorer.store';
 
@@ -42,30 +46,24 @@ interface CreateFileButtonProps {
   suggestedPath?: string;
 }
 
-type FileWriteStatus =
-  | 'idle'
-  | 'writing'
-  | 'created'
-  | 'updated'
-  | 'error';
-
 interface MultiFileActionsProps {
+  autoApplyRequested?: boolean;
   blocks: FileBlock[];
 }
 
-function MultiFileActions({ blocks }: MultiFileActionsProps) {
+function MultiFileActions({
+  autoApplyRequested,
+  blocks,
+}: MultiFileActionsProps) {
   const projectSource = useExplorerStore(
     (state) => state.projectSource,
   );
   const fileHandles = useExplorerStore((state) => state.fileHandles);
-  const upsertFileInProject = useExplorerStore(
-    (state) => state.upsertFileInProject,
+  const openDiffQueue = useDiffStore(
+    (state) => state.openDiffQueue,
   );
-  const [statuses, setStatuses] = useState<
-    Record<number, FileWriteStatus>
-  >({});
-  const [errors, setErrors] = useState<Record<number, string>>({});
-  const [isWritingAll, setIsWritingAll] = useState(false);
+  const [isPreparing, setIsPreparing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (projectSource !== 'fsa') {
     return (
@@ -80,73 +78,67 @@ function MultiFileActions({ blocks }: MultiFileActionsProps) {
     );
   }
 
-  async function writeOne(index: number): Promise<boolean> {
-    const block = blocks[index];
-    if (!block?.filename) {
-      return false;
-    }
-
-    setStatuses((current) => ({
-      ...current,
-      [index]: 'writing',
-    }));
-    setErrors((current) => {
-      const next = { ...current };
-      delete next[index];
-      return next;
-    });
-
+  async function reviewBlocks(
+    selectedBlocks: FileBlock[],
+  ): Promise<void> {
+    setIsPreparing(true);
+    setError(null);
     try {
-      const operation = await upsertFileInProject(
-        block.filename,
-        block.code,
-      );
-      setStatuses((current) => ({
-        ...current,
-        [index]: operation,
-      }));
-      return true;
-    } catch (error) {
-      setStatuses((current) => ({
-        ...current,
-        [index]: 'error',
-      }));
-      setErrors((current) => ({
-        ...current,
-        [index]:
-          error instanceof Error
-            ? error.message
-            : 'Could not write file',
-      }));
-      return false;
-    }
-  }
-
-  async function writeAll(): Promise<void> {
-    setIsWritingAll(true);
-    try {
-      for (let index = 0; index < blocks.length; index += 1) {
-        const status = statuses[index];
-        if (status !== 'created' && status !== 'updated') {
-          await writeOne(index);
+      const diffs: OpenDiffParams[] = [];
+      for (const block of selectedBlocks) {
+        if (!block.filename) {
+          continue;
         }
+
+        const existingPath = [...fileHandles.keys()].find(
+          (path) =>
+            path.toLowerCase() === block.filename?.toLowerCase(),
+        );
+        const handle = existingPath
+          ? fileHandles.get(existingPath)
+          : undefined;
+        const originalContent = handle
+          ? await fsaAdapter.readFile(handle)
+          : '';
+        if (originalContent === null) {
+          throw new Error(
+            `${existingPath} is binary or too large to review`,
+          );
+        }
+
+        const filePath = existingPath ?? block.filename;
+        diffs.push({
+          fileId: filePath,
+          fileName: filePath,
+          language: toMonacoLanguage(block.language),
+          originalContent,
+          modifiedContent: block.code,
+        });
       }
+
+      openDiffQueue(diffs);
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'Could not prepare file diffs',
+      );
     } finally {
-      setIsWritingAll(false);
+      setIsPreparing(false);
     }
   }
 
-  const allDone =
-    blocks.length > 0 &&
-    blocks.every((_, index) => {
-      const status = statuses[index];
-      return status === 'created' || status === 'updated';
-    });
+  if (autoApplyRequested) {
+    return (
+      <div className="mt-2 text-[11px] text-muted">
+        {blocks.length} files detected for Auto-Apply.
+      </div>
+    );
+  }
 
   return (
     <div className="mt-2 flex w-full flex-col gap-1.5">
       {blocks.map((block, index) => {
-        const status = statuses[index] ?? 'idle';
         const exists = [...fileHandles.keys()].some(
           (path) =>
             path.toLowerCase() === block.filename?.toLowerCase(),
@@ -168,57 +160,40 @@ function MultiFileActions({ blocks }: MultiFileActionsProps) {
               {block.lineCount} lines
             </span>
 
-            {status === 'created' || status === 'updated' ? (
-              <span className="shrink-0 text-success">
-                {'\u2713'} {status === 'created' ? 'Created' : 'Updated'}
-              </span>
-            ) : (
-              <button
-                className="flex shrink-0 items-center gap-1 rounded border border-accent bg-surface-2 px-2 py-0.5 text-accent disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={status === 'writing' || isWritingAll}
-                onClick={() => void writeOne(index)}
-                title={errors[index]}
-                type="button"
-              >
-                {status === 'writing' ? (
-                  <Loader2 className="animate-spin" size={10} />
-                ) : (
-                  <FilePlus size={10} />
-                )}
-                {status === 'writing'
-                  ? 'Writing'
-                  : status === 'error'
-                    ? 'Retry'
-                    : exists
-                      ? 'Update'
-                      : 'Create'}
-              </button>
-            )}
+            <button
+              className="flex shrink-0 items-center gap-1 rounded border border-accent bg-surface-2 px-2 py-0.5 text-accent disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isPreparing}
+              onClick={() => void reviewBlocks([block])}
+              type="button"
+            >
+              <Zap size={10} />
+              {exists ? 'Review update' : 'Review new file'}
+            </button>
           </div>
         );
       })}
 
-      {blocks.length > 1 && !allDone ? (
+      {blocks.length > 1 ? (
         <button
           className="mt-1 flex items-center justify-center gap-1.5 rounded bg-accent px-2.5 py-1 text-[11px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-70"
-          disabled={isWritingAll}
-          onClick={() => void writeAll()}
+          disabled={isPreparing}
+          onClick={() => void reviewBlocks(blocks)}
           type="button"
         >
-          {isWritingAll ? (
+          {isPreparing ? (
             <Loader2 className="animate-spin" size={11} />
           ) : (
-            <FilePlus size={11} />
+            <Zap size={11} />
           )}
-          {isWritingAll
-            ? 'Writing files...'
-            : `Create or Update All (${blocks.length})`}
+          {isPreparing
+            ? 'Preparing diffs...'
+            : `Review All Diffs (${blocks.length})`}
         </button>
       ) : null}
 
-      {allDone && blocks.length > 1 ? (
-        <span className="text-[11px] text-success">
-          {'\u2713'} All {blocks.length} files written
+      {error ? (
+        <span className="text-[11px] text-error" role="alert">
+          {error}
         </span>
       ) : null}
     </div>
@@ -646,7 +621,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
         ) : null}
       </div>
       {namedFileBlocks.length > 0 ? (
-        <MultiFileActions blocks={namedFileBlocks} />
+        <MultiFileActions
+          autoApplyRequested={message.autoApplyRequested}
+          blocks={namedFileBlocks}
+        />
       ) : null}
       {fallbackBlock ? (
         <div className="mt-2 flex flex-col gap-2">

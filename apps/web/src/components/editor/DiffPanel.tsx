@@ -10,7 +10,7 @@ import {
 import { useRef, useState } from 'react';
 
 import { useDiffStore } from '@/stores/diff.store';
-import { useEditorStore } from '@/stores/editor.store';
+import { useExplorerStore } from '@/stores/explorer.store';
 
 import { DiffViewer, type DiffViewerHandle } from './DiffViewer';
 
@@ -27,22 +27,19 @@ export function DiffPanel() {
     (state) => state.renderSideBySide,
   );
   const fileId = useDiffStore((state) => state.fileId);
-  const closeDiff = useDiffStore((state) => state.closeDiff);
+  const queue = useDiffStore((state) => state.queue);
+  const queueIndex = useDiffStore((state) => state.queueIndex);
+  const advanceDiff = useDiffStore((state) => state.advanceDiff);
   const toggleRenderMode = useDiffStore(
     (state) => state.toggleRenderMode,
   );
-  const updateContent = useEditorStore(
-    (state) => state.updateContent,
+  const upsertFileInProject = useExplorerStore(
+    (state) => state.upsertFileInProject,
   );
-  const setActiveFile = useEditorStore(
-    (state) => state.setActiveFile,
-  );
-  const saveActiveFile = useEditorStore(
-    (state) => state.saveActiveFile,
-  );
-  const isSaving = useEditorStore((state) => state.isSaving);
   const diffViewerRef = useRef<DiffViewerHandle>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const hasNext = queueIndex < queue.length - 1;
 
   async function handleAccept(): Promise<void> {
     if (!fileId) {
@@ -50,34 +47,26 @@ export function DiffPanel() {
     }
 
     setSaveError(null);
-    const targetFile = useEditorStore
-      .getState()
-      .openFiles.find((file) => file.id === fileId);
-    if (!targetFile) {
-      setSaveError(
-        'The target file is no longer open. Reopen it and start the diff again.',
-      );
-      return;
-    }
-
     const finalContent =
       diffViewerRef.current?.getModifiedContent() ?? modifiedContent;
-
-    setActiveFile(fileId);
-    updateContent(fileId, finalContent);
-    await saveActiveFile();
-
-    const savedFile = useEditorStore
-      .getState()
-      .openFiles.find((file) => file.id === fileId);
-    if (savedFile?.isDirty) {
+    setIsSaving(true);
+    try {
+      await upsertFileInProject(fileId, finalContent);
+      advanceDiff();
+    } catch (error) {
       setSaveError(
-        'Could not save this file. Review the project error and try again.',
+        error instanceof Error
+          ? error.message
+          : 'Could not apply this file.',
       );
-      return;
+    } finally {
+      setIsSaving(false);
     }
+  }
 
-    closeDiff();
+  function handleDiscard(): void {
+    setSaveError(null);
+    advanceDiff();
   }
 
   return (
@@ -94,6 +83,11 @@ export function DiffPanel() {
               <span className="truncate font-mono text-xs text-foreground">
                 {fileName}
               </span>
+              {queue.length > 1 ? (
+                <span className="text-[10px] text-muted">
+                  {queueIndex + 1}/{queue.length}
+                </span>
+              ) : null}
             </>
           ) : null}
         </div>
@@ -127,11 +121,11 @@ export function DiffPanel() {
           <button
             className="flex items-center gap-1.5 rounded border border-border bg-surface-2 px-3 py-1 text-xs font-medium text-muted transition-colors hover:text-foreground"
             disabled={isSaving}
-            onClick={closeDiff}
+            onClick={handleDiscard}
             type="button"
           >
             <X size={12} />
-            Discard
+            {hasNext ? 'Discard & Next' : 'Discard'}
           </button>
 
           <button
@@ -141,7 +135,11 @@ export function DiffPanel() {
             type="button"
           >
             <Check size={12} />
-            {isSaving ? 'Saving...' : 'Accept Changes'}
+            {isSaving
+              ? 'Applying...'
+              : hasNext
+                ? 'Accept & Next'
+                : 'Accept Changes'}
           </button>
         </div>
       </div>
@@ -164,6 +162,7 @@ export function DiffPanel() {
 
       <div className="min-h-0 flex-1">
         <DiffViewer
+          key={`${fileId ?? 'diff'}-${queueIndex}`}
           language={language}
           modified={modifiedContent}
           original={originalContent}

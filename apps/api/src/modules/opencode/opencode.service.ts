@@ -169,8 +169,10 @@ export class OpenCodeService {
         : '',
       params.webContext
         ? [
-            'Web browsing results:',
-            'Use these external results for current/latest/API documentation questions. Cite URLs when using facts from them.',
+            'Web browsing completed before generation. Results are included below:',
+            'CRITICAL: use these results for concrete CDN URLs, package names, imports, API methods, signatures, configuration, and versions.',
+            'If official-only sources were requested, do not introduce unofficial facts or links.',
+            'Cite the source URLs.',
             params.webContext,
           ].join('\n')
         : '',
@@ -207,6 +209,11 @@ export class OpenCodeService {
     }
 
     mkdirSync(this.workingDirectory, { recursive: true });
+    const webContext = await this.getWebContext(
+      params.content,
+      params.content,
+      response,
+    );
     let effectiveContent = params.content;
 
     if (params.promptOptimize) {
@@ -238,11 +245,6 @@ export class OpenCodeService {
       }
     }
 
-    const webContext = await this.getWebContext(
-      params.content,
-      effectiveContent,
-      response,
-    );
     const prompt = this.buildPrompt({
       ...params,
       content: effectiveContent,
@@ -423,7 +425,11 @@ export class OpenCodeService {
       query: searchQuery,
     });
 
-    const result = await this.webSearch.search(searchQuery);
+    const result = await this.webSearch.search(
+      searchQuery,
+      undefined,
+      this.webSearch.getSearchOptions(originalRequest),
+    );
     if (!result) {
       this.send(response, {
         type: 'web_search',
@@ -454,11 +460,14 @@ export class OpenCodeService {
       return [
         'Required output format:',
         'Return every requested file with its complete contents.',
-        'Before each code block, write its relative path as a bold label, for example: **src/index.html**',
+        'Begin the multi-file section with ```files.',
+        'Immediately before each code block, write FILE: relative/path.ext on its own line.',
         'Use one fenced markdown code block per file and label each block with its language.',
+        'End the multi-file section with a final ``` line.',
+        'For a browser app, use index.html, style.css, and script.js. The entry file is index.html.',
         'Do not omit files, use placeholders, or combine files in one code block.',
         'Include the active reference file as a labeled file when it is part of the requested project changes.',
-        'CodeFlow AI will create or update every labeled file.',
+        'CodeFlow AI parses each FILE: path.ext block separately. Never collapse multiple files into the active editor file.',
       ].join('\n');
     }
 
