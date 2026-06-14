@@ -1,3 +1,5 @@
+import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
+
 import helmet from '@fastify/helmet';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -10,6 +12,17 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+
+// Route native fetch calls through corporate proxy settings when configured.
+// EnvHttpProxyAgent also honors NO_PROXY.
+if (
+  process.env.HTTP_PROXY ||
+  process.env.HTTPS_PROXY ||
+  process.env.http_proxy ||
+  process.env.https_proxy
+) {
+  setGlobalDispatcher(new EnvHttpProxyAgent());
+}
 
 interface HealthReply {
   status(code: number): {

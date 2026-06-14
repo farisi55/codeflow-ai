@@ -1,9 +1,15 @@
 .git
 .next
+**/.next
 .turbo
+**/.turbo
 dist
+**/dist
 node_modules
+**/node_modules
 coverage
+**/coverage
 .env*
 !.env.example
 *.log
+projects/

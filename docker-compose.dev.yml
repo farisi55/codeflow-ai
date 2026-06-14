@@ -1,38 +1,94 @@
 name: codeflow-ai-dev
 
+x-proxy-env: &proxy-env
+  HTTP_PROXY: ${HTTP_PROXY:-}
+  HTTPS_PROXY: ${HTTPS_PROXY:-}
+  NO_PROXY: ${NO_PROXY:-}
+  http_proxy: ${HTTP_PROXY:-}
+  https_proxy: ${HTTPS_PROXY:-}
+  no_proxy: ${NO_PROXY:-}
+
+x-dns: &dns-servers
+  - ${DOCKER_DNS_1:-1.1.1.1}
+  - ${DOCKER_DNS_2:-8.8.8.8}
+
 services:
   web:
     image: node:22-alpine
     working_dir: /workspace
-    command: corepack pnpm --filter @codeflow/web dev --hostname 0.0.0.0
+    command: sh -c "apk add --no-cache bash >/dev/null 2>&1 || true; corepack enable && corepack pnpm --filter @codeflow/web dev --hostname 0.0.0.0"
     env_file:
       - path: .env.local
         required: false
     environment:
+      <<: *proxy-env
       NODE_ENV: development
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
     ports:
       - "${WEB_PORT:-3000}:3000"
+    dns: *dns-servers
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - .:/workspace
       - pnpm-store:/root/.local/share/pnpm/store
       - root-node-modules:/workspace/node_modules
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
 
   api:
     image: node:22-alpine
     working_dir: /workspace
-    command: corepack pnpm --filter @codeflow/api dev
+    command: >
+      sh -c "
+        apk add --no-cache python3 make g++ bash git curl >/dev/null 2>&1 &&
+        npm install -g opencode-ai >/dev/null 2>&1 &&
+        corepack enable &&
+        corepack pnpm install --no-frozen-lockfile &&
+        corepack pnpm --filter @codeflow/api dev
+      "
     env_file:
       - path: .env.local
         required: false
     environment:
+      <<: *proxy-env
       NODE_ENV: development
       APP_PORT: 4000
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/codeflow_ai
-      REDIS_URL: redis://redis:6379
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      API_PUBLIC_URL: ${API_PUBLIC_URL:-http://localhost:4000}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_DEFAULT_MODEL: ${GROQ_DEFAULT_MODEL:-llama-3.3-70b-versatile}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_DEFAULT_MODEL: ${GEMINI_DEFAULT_MODEL:-gemini-2.0-flash}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      MISTRAL_DEFAULT_MODEL: ${MISTRAL_DEFAULT_MODEL:-mistral-large-latest}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_DEFAULT_MODEL: ${OPENROUTER_DEFAULT_MODEL:-openrouter/free}
+      SAMBANOVA_API_KEY: ${SAMBANOVA_API_KEY:-}
+      SAMBANOVA_BASE_URL: ${SAMBANOVA_BASE_URL:-https://api.sambanova.ai/v1}
+      SAMBANOVA_DEFAULT_MODEL: ${SAMBANOVA_DEFAULT_MODEL:-Meta-Llama-3.3-70B-Instruct}
+      ZAI_API_KEY: ${ZAI_API_KEY:-}
+      ZAI_BASE_URL: ${ZAI_BASE_URL:-https://api.z.ai/api/paas/v4}
+      ZAI_DEFAULT_MODEL: ${ZAI_DEFAULT_MODEL:-glm-5.1}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_BASE_URL: ${CLOUDFLARE_BASE_URL:-https://api.cloudflare.com/client/v4}
+      CLOUDFLARE_DEFAULT_MODEL: ${CLOUDFLARE_DEFAULT_MODEL:-@cf/meta/llama-3.1-8b-instruct}
+      GITHUB_MODELS_API_KEY: ${GITHUB_MODELS_API_KEY:-}
+      GITHUB_MODELS_BASE_URL: ${GITHUB_MODELS_BASE_URL:-https://models.github.ai/inference}
+      GITHUB_MODELS_DEFAULT_MODEL: ${GITHUB_MODELS_DEFAULT_MODEL:-openai/gpt-4.1-mini}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_DEFAULT_MODEL: ${OLLAMA_DEFAULT_MODEL:-llama3.2}
+      OPENCODE_TIMEOUT_MS: ${OPENCODE_TIMEOUT_MS:-120000}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
+      WEB_SEARCH_TIMEOUT_MS: ${WEB_SEARCH_TIMEOUT_MS:-15000}
+      TERMINAL_ENABLED: "true"
+      TERMINAL_ALLOW_REMOTE: ${TERMINAL_ALLOW_REMOTE:-}
+      PREVIEW_ENABLED: "true"
+      PREVIEW_ALLOW_REMOTE: ${PREVIEW_ALLOW_REMOTE:-}
+      PREVIEW_READY_TIMEOUT_MS: ${PREVIEW_READY_TIMEOUT_MS:-30000}
     ports:
       - "${APP_PORT:-4000}:4000"
       - "9229:9229"
@@ -40,44 +96,20 @@ services:
       - .:/workspace
       - pnpm-store:/root/.local/share/pnpm/store
       - root-node-modules:/workspace/node_modules
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: codeflow_ai
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres-dev-data:/var/lib/postgresql/data
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - pg_isready -U postgres -d codeflow_ai
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-dev-data:/data
+      - ${PROJECTS_DIR:-./projects}:/workspace/projects
+    dns: *dns-servers
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test:
         - CMD
-        - redis-cli
-        - ping
+        - node
+        - -e
+        - "fetch('http://localhost:4000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
       interval: 5s
-      timeout: 3s
-      retries: 10
+      timeout: 5s
+      retries: 30
+      start_period: 30s
 
   ollama:
     image: ollama/ollama:latest
@@ -87,10 +119,9 @@ services:
       - "11434:11434"
     volumes:
       - ollama-dev-data:/root/.ollama
+    dns: *dns-servers
 
 volumes:
   pnpm-store:
   root-node-modules:
-  postgres-dev-data:
-  redis-dev-data:
   ollama-dev-data:
