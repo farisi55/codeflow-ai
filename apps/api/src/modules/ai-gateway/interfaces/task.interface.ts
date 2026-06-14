@@ -11,6 +11,8 @@ export enum TaskType {
 
 export const TASK_PROVIDER_MAP: Record<TaskType, string[]> = {
   [TaskType.CODE_GENERATION]: [
+    'github',
+    'cloudflare',
     'groq',
     'zai',
     'sambanova',
@@ -20,8 +22,10 @@ export const TASK_PROVIDER_MAP: Record<TaskType, string[]> = {
     'ollama',
   ],
   [TaskType.REFACTOR]: [
+    'github',
     'zai',
     'gemini',
+    'cloudflare',
     'groq',
     'sambanova',
     'mistral',
@@ -30,6 +34,8 @@ export const TASK_PROVIDER_MAP: Record<TaskType, string[]> = {
   ],
   [TaskType.QUICK_QUESTION]: [
     'groq',
+    'cloudflare',
+    'github',
     'sambanova',
     'zai',
     'gemini',
@@ -38,8 +44,10 @@ export const TASK_PROVIDER_MAP: Record<TaskType, string[]> = {
     'ollama',
   ],
   [TaskType.ARCHITECTURE]: [
+    'github',
     'zai',
     'gemini',
+    'cloudflare',
     'openrouter',
     'sambanova',
     'groq',
@@ -47,8 +55,10 @@ export const TASK_PROVIDER_MAP: Record<TaskType, string[]> = {
     'ollama',
   ],
   [TaskType.DOCUMENTATION]: [
+    'github',
     'gemini',
     'zai',
+    'cloudflare',
     'mistral',
     'sambanova',
     'groq',
@@ -56,8 +66,10 @@ export const TASK_PROVIDER_MAP: Record<TaskType, string[]> = {
     'ollama',
   ],
   [TaskType.LARGE_CONTEXT]: [
+    'github',
     'zai',
     'gemini',
+    'cloudflare',
     'openrouter',
     'sambanova',
     'groq',
@@ -65,8 +77,10 @@ export const TASK_PROVIDER_MAP: Record<TaskType, string[]> = {
     'ollama',
   ],
   [TaskType.CODE_REVIEW]: [
+    'github',
     'zai',
     'groq',
+    'cloudflare',
     'gemini',
     'sambanova',
     'mistral',
@@ -74,8 +88,10 @@ export const TASK_PROVIDER_MAP: Record<TaskType, string[]> = {
     'ollama',
   ],
   [TaskType.GENERAL]: [
+    'github',
     'sambanova',
     'groq',
+    'cloudflare',
     'zai',
     'gemini',
     'mistral',
@@ -85,6 +101,8 @@ export const TASK_PROVIDER_MAP: Record<TaskType, string[]> = {
 };
 
 export const GLOBAL_FALLBACK_CHAIN: string[] = [
+  'github',
+  'cloudflare',
   'groq',
   'sambanova',
   'zai',

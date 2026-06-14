@@ -44,6 +44,28 @@ export const providersConfig = registerAs('providers', () => ({
     baseUrl: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434',
     defaultModel: process.env.OLLAMA_DEFAULT_MODEL ?? 'llama3.2',
   },
+  cloudflare: {
+    apiKey: process.env.CLOUDFLARE_API_TOKEN ?? '',
+    accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? '',
+    baseUrl:
+      process.env.CLOUDFLARE_BASE_URL ??
+      'https://api.cloudflare.com/client/v4',
+    defaultModel:
+      process.env.CLOUDFLARE_DEFAULT_MODEL ??
+      '@cf/meta/llama-3.1-8b-instruct',
+  },
+  github: {
+    apiKey:
+      process.env.GITHUB_MODELS_API_KEY ??
+      process.env.GITHUB_TOKEN ??
+      '',
+    baseUrl:
+      process.env.GITHUB_MODELS_BASE_URL ??
+      'https://models.github.ai/inference',
+    defaultModel:
+      process.env.GITHUB_MODELS_DEFAULT_MODEL ??
+      'openai/gpt-4.1-mini',
+  },
   webSearch: {
     tavily: {
       apiKey: process.env.TAVILY_API_KEY ?? '',

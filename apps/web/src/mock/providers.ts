@@ -8,6 +8,30 @@ export interface ProviderOption {
 export const MOCK_PROVIDERS: ProviderOption[] = [
   { id: 'auto', name: 'Auto', models: ['Auto'] },
   {
+    id: 'cloudflare',
+    name: 'Cloudflare AI',
+    models: [
+      '@cf/meta/llama-3.1-8b-instruct',
+      '@cf/meta/llama-3.1-70b-instruct',
+      '@cf/mistral/mistral-7b-instruct-v0.2-lora',
+      '@cf/qwen/qwen1.5-14b-chat-awq',
+      '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
+    ],
+  },
+  {
+    id: 'github',
+    name: 'GitHub Models',
+    models: [
+      'openai/gpt-4.1-mini',
+      'openai/gpt-4.1',
+      'openai/gpt-4o',
+      'openai/gpt-4o-mini',
+      'microsoft/phi-4',
+      'meta/llama-3.3-70b-instruct',
+      'mistral-ai/mistral-large-2411',
+    ],
+  },
+  {
     id: 'groq',
     name: 'Groq',
     models: [

@@ -11,7 +11,9 @@ import type {
   ProviderModel,
   ProviderMessage,
 } from './interfaces/provider.interface';
+import { CloudflareProvider } from './providers/cloudflare.provider';
 import { GeminiProvider } from './providers/gemini.provider';
+import { GitHubModelsProvider } from './providers/github-models.provider';
 import { GroqProvider } from './providers/groq.provider';
 import { MistralProvider } from './providers/mistral.provider';
 import { OllamaProvider } from './providers/ollama.provider';
@@ -80,6 +82,8 @@ export class AIGatewayService {
     private readonly skills: SkillsService,
     private readonly webSearch: WebSearchService,
     private readonly promptOptimizer: PromptOptimizerService,
+    cloudflare: CloudflareProvider,
+    github: GitHubModelsProvider,
     groq: GroqProvider,
     gemini: GeminiProvider,
     mistral: MistralProvider,
@@ -89,6 +93,8 @@ export class AIGatewayService {
     ollama: OllamaProvider,
   ) {
     this.providerMap = new Map<string, IProvider>([
+      ['cloudflare', cloudflare],
+      ['github', github],
       ['groq', groq],
       ['gemini', gemini],
       ['mistral', mistral],

@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 
 import { ProviderHealthService } from '../ai-gateway/health/provider-health.service';
+import { CloudflareProvider } from '../ai-gateway/providers/cloudflare.provider';
 import { GeminiProvider } from '../ai-gateway/providers/gemini.provider';
+import { GitHubModelsProvider } from '../ai-gateway/providers/github-models.provider';
 import { GroqProvider } from '../ai-gateway/providers/groq.provider';
 import { MistralProvider } from '../ai-gateway/providers/mistral.provider';
 import { OllamaProvider } from '../ai-gateway/providers/ollama.provider';
@@ -13,6 +15,8 @@ import { FallbackService } from '../ai-gateway/routing/fallback.service';
 import { TaskRouterService } from '../ai-gateway/routing/task-router.service';
 
 const PROVIDERS = [
+  CloudflareProvider,
+  GitHubModelsProvider,
   GroqProvider,
   GeminiProvider,
   MistralProvider,
