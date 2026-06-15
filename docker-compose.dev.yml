@@ -1,75 +1,44 @@
 name: codeflow-ai-dev
 
-x-proxy-env: &proxy-env
-  HTTP_PROXY: ${HTTP_PROXY:-}
-  HTTPS_PROXY: ${HTTPS_PROXY:-}
-  NO_PROXY: ${NO_PROXY:-}
-  http_proxy: ${HTTP_PROXY:-}
-  https_proxy: ${HTTPS_PROXY:-}
-  no_proxy: ${NO_PROXY:-}
-
-x-dns: &dns-servers
-  - ${DOCKER_DNS_1:-1.1.1.1}
-  - ${DOCKER_DNS_2:-8.8.8.8}
-
 services:
   web:
     image: node:22-alpine
     working_dir: /workspace
-    command: sh -c "apk add --no-cache bash >/dev/null 2>&1 || true; corepack enable && corepack pnpm --filter @codeflow/web dev --hostname 0.0.0.0"
+    command: corepack pnpm --filter @codeflow/web dev --hostname 0.0.0.0
     env_file:
-      - path: .env
-        required: false
       - path: .env.local
         required: false
       - path: apps/api/.env
         required: false
     environment:
-      <<: *proxy-env
       NODE_ENV: development
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
     ports:
       - "${WEB_PORT:-3000}:3000"
-    dns: *dns-servers
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - .:/workspace
       - pnpm-store:/root/.local/share/pnpm/store
       - root-node-modules:/workspace/node_modules
     depends_on:
       api:
-        condition: service_healthy
+        condition: service_started
 
   api:
     image: node:22-alpine
     working_dir: /workspace
-    command: >
-      sh -c "
-        apk add --no-cache python3 make g++ bash git curl >/dev/null 2>&1 &&
-        npm install -g opencode-ai >/dev/null 2>&1 &&
-        corepack enable &&
-        corepack pnpm install --no-frozen-lockfile &&
-        corepack pnpm --filter @codeflow/api dev
-      "
+    command: sh -lc "corepack enable && corepack pnpm install --no-frozen-lockfile && corepack pnpm --filter @codeflow/api dev"
     env_file:
-      - path: .env
-        required: false
       - path: .env.local
         required: false
       - path: apps/api/.env
         required: false
     environment:
-      <<: *proxy-env
       NODE_ENV: development
       APP_PORT: 4000
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
-      API_PUBLIC_URL: ${API_PUBLIC_URL:-http://localhost:4000}
-      TERMINAL_ENABLED: "true"
-      TERMINAL_ALLOW_REMOTE: ${TERMINAL_ALLOW_REMOTE:-}
-      PREVIEW_ENABLED: "true"
-      PREVIEW_ALLOW_REMOTE: ${PREVIEW_ALLOW_REMOTE:-}
-      PREVIEW_READY_TIMEOUT_MS: ${PREVIEW_READY_TIMEOUT_MS:-30000}
+      TERMINAL_ENABLED: ${TERMINAL_ENABLED:-true}
+      TERMINAL_ALLOW_REMOTE: ${TERMINAL_ALLOW_REMOTE:-false}
+      PREVIEW_ENABLED: ${PREVIEW_ENABLED:-true}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
     ports:
       - "${APP_PORT:-4000}:4000"
       - "9229:9229"
@@ -77,20 +46,6 @@ services:
       - .:/workspace
       - pnpm-store:/root/.local/share/pnpm/store
       - root-node-modules:/workspace/node_modules
-      - ${PROJECTS_DIR:-./projects}:/workspace/projects
-    dns: *dns-servers
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    healthcheck:
-      test:
-        - CMD
-        - node
-        - -e
-        - "fetch('http://localhost:4000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
-      interval: 5s
-      timeout: 5s
-      retries: 30
-      start_period: 30s
 
   ollama:
     image: ollama/ollama:latest
@@ -100,7 +55,6 @@ services:
       - "11434:11434"
     volumes:
       - ollama-dev-data:/root/.ollama
-    dns: *dns-servers
 
 volumes:
   pnpm-store:
