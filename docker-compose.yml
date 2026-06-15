@@ -24,9 +24,12 @@ services:
       dockerfile: docker/Dockerfile.web
       args:
         <<: *proxy-build-args
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
     environment:
       <<: *proxy-env
       NODE_ENV: production
+      # The client bundle already contains the build arg above. Changing this
+      # value requires rebuilding the web image, not only restarting it.
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
     ports:
       - "${WEB_PORT:-3000}:3000"
