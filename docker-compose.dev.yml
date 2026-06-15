@@ -18,7 +18,11 @@ services:
     working_dir: /workspace
     command: sh -c "apk add --no-cache bash >/dev/null 2>&1 || true; corepack enable && corepack pnpm --filter @codeflow/web dev --hostname 0.0.0.0"
     env_file:
+      - path: .env
+        required: false
       - path: .env.local
+        required: false
+      - path: apps/api/.env
         required: false
     environment:
       <<: *proxy-env
@@ -49,7 +53,11 @@ services:
         corepack pnpm --filter @codeflow/api dev
       "
     env_file:
+      - path: .env
+        required: false
       - path: .env.local
+        required: false
+      - path: apps/api/.env
         required: false
     environment:
       <<: *proxy-env
@@ -57,33 +65,6 @@ services:
       APP_PORT: 4000
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       API_PUBLIC_URL: ${API_PUBLIC_URL:-http://localhost:4000}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      GROQ_DEFAULT_MODEL: ${GROQ_DEFAULT_MODEL:-llama-3.3-70b-versatile}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_DEFAULT_MODEL: ${GEMINI_DEFAULT_MODEL:-gemini-2.0-flash}
-      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
-      MISTRAL_DEFAULT_MODEL: ${MISTRAL_DEFAULT_MODEL:-mistral-large-latest}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_DEFAULT_MODEL: ${OPENROUTER_DEFAULT_MODEL:-openrouter/free}
-      SAMBANOVA_API_KEY: ${SAMBANOVA_API_KEY:-}
-      SAMBANOVA_BASE_URL: ${SAMBANOVA_BASE_URL:-https://api.sambanova.ai/v1}
-      SAMBANOVA_DEFAULT_MODEL: ${SAMBANOVA_DEFAULT_MODEL:-Meta-Llama-3.3-70B-Instruct}
-      ZAI_API_KEY: ${ZAI_API_KEY:-}
-      ZAI_BASE_URL: ${ZAI_BASE_URL:-https://api.z.ai/api/paas/v4}
-      ZAI_DEFAULT_MODEL: ${ZAI_DEFAULT_MODEL:-glm-5.1}
-      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
-      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
-      CLOUDFLARE_BASE_URL: ${CLOUDFLARE_BASE_URL:-https://api.cloudflare.com/client/v4}
-      CLOUDFLARE_DEFAULT_MODEL: ${CLOUDFLARE_DEFAULT_MODEL:-@cf/meta/llama-3.1-8b-instruct}
-      GITHUB_MODELS_API_KEY: ${GITHUB_MODELS_API_KEY:-}
-      GITHUB_MODELS_BASE_URL: ${GITHUB_MODELS_BASE_URL:-https://models.github.ai/inference}
-      GITHUB_MODELS_DEFAULT_MODEL: ${GITHUB_MODELS_DEFAULT_MODEL:-openai/gpt-4.1-mini}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
-      OLLAMA_DEFAULT_MODEL: ${OLLAMA_DEFAULT_MODEL:-llama3.2}
-      OPENCODE_TIMEOUT_MS: ${OPENCODE_TIMEOUT_MS:-120000}
-      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
-      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
-      WEB_SEARCH_TIMEOUT_MS: ${WEB_SEARCH_TIMEOUT_MS:-15000}
       TERMINAL_ENABLED: "true"
       TERMINAL_ALLOW_REMOTE: ${TERMINAL_ALLOW_REMOTE:-}
       PREVIEW_ENABLED: "true"
