@@ -1,15 +1,41 @@
 name: codeflow-ai
 
+x-proxy-env: &proxy-env
+  HTTP_PROXY: ${HTTP_PROXY:-}
+  HTTPS_PROXY: ${HTTPS_PROXY:-}
+  NO_PROXY: ${NO_PROXY:-}
+  http_proxy: ${HTTP_PROXY:-}
+  https_proxy: ${HTTPS_PROXY:-}
+  no_proxy: ${NO_PROXY:-}
+
+x-dns: &dns-servers
+  - ${DOCKER_DNS_1:-1.1.1.1}
+  - ${DOCKER_DNS_2:-8.8.8.8}
+
+x-proxy-build-args: &proxy-build-args
+  HTTP_PROXY: ${HTTP_PROXY:-}
+  HTTPS_PROXY: ${HTTPS_PROXY:-}
+  NO_PROXY: ${NO_PROXY:-}
+
 services:
   web:
     build:
       context: .
       dockerfile: docker/Dockerfile.web
+      args:
+        <<: *proxy-build-args
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
     environment:
+      <<: *proxy-env
       NODE_ENV: production
+      # The client bundle already contains the build arg above. Changing this
+      # value requires rebuilding the web image, not only restarting it.
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
     ports:
       - "${WEB_PORT:-3000}:3000"
+    dns: *dns-servers
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       api:
         condition: service_healthy
@@ -19,60 +45,36 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.api
+      args:
+        <<: *proxy-build-args
     env_file:
       - path: .env
         required: false
       - path: apps/api/.env
         required: false
     environment:
+      <<: *proxy-env
       NODE_ENV: production
       APP_PORT: 4000
-      JWT_SECRET: ${JWT_SECRET:-changeme}
-      API_KEY_ENCRYPTION_SECRET: ${API_KEY_ENCRYPTION_SECRET:-changeme32chars}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      API_PUBLIC_URL: ${API_PUBLIC_URL:-http://localhost:4000}
 
-      # Integrated terminal
+
+
+
       TERMINAL_ENABLED: ${TERMINAL_ENABLED:-true}
-      TERMINAL_ALLOW_REMOTE: ${TERMINAL_ALLOW_REMOTE:-false}
-      TERMINAL_SHELL: ${TERMINAL_SHELL:-}
-
-      # Preview
+      TERMINAL_ALLOW_REMOTE: ${TERMINAL_ALLOW_REMOTE:-}
       PREVIEW_ENABLED: ${PREVIEW_ENABLED:-true}
-
-      # OpenCode Agent
-      OPENCODE_API_KEY: ${OPENCODE_API_KEY:-}
-      OPENCODE_TIMEOUT_MS: ${OPENCODE_TIMEOUT_MS:-120000}
-
-      # AI Providers
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_DEFAULT_MODEL: ${OPENROUTER_DEFAULT_MODEL:-openrouter/free}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      GROQ_DEFAULT_MODEL: ${GROQ_DEFAULT_MODEL:-llama-3.3-70b-versatile}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_DEFAULT_MODEL: ${GEMINI_DEFAULT_MODEL:-gemini-2.0-flash}
-      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
-      MISTRAL_DEFAULT_MODEL: ${MISTRAL_DEFAULT_MODEL:-mistral-large-latest}
-      SAMBANOVA_API_KEY: ${SAMBANOVA_API_KEY:-}
-      SAMBANOVA_BASE_URL: ${SAMBANOVA_BASE_URL:-https://api.sambanova.ai/v1}
-      SAMBANOVA_DEFAULT_MODEL: ${SAMBANOVA_DEFAULT_MODEL:-Meta-Llama-3.3-70B-Instruct}
-      ZAI_API_KEY: ${ZAI_API_KEY:-}
-      ZAI_BASE_URL: ${ZAI_BASE_URL:-https://api.z.ai/api/paas/v4}
-      ZAI_DEFAULT_MODEL: ${ZAI_DEFAULT_MODEL:-glm-5.1}
-      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
-      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
-      CLOUDFLARE_DEFAULT_MODEL: ${CLOUDFLARE_DEFAULT_MODEL:-@cf/meta/llama-3.1-8b-instruct}
-      GITHUB_MODELS_API_KEY: ${GITHUB_MODELS_API_KEY:-}
-      GITHUB_MODELS_DEFAULT_MODEL: ${GITHUB_MODELS_DEFAULT_MODEL:-openai/gpt-4.1-mini}
-
-      # Web browsing
-      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
-      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
-      WEB_SEARCH_TIMEOUT_MS: ${WEB_SEARCH_TIMEOUT_MS:-15000}
-
-      # Ollama - optional
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
-      OLLAMA_DEFAULT_MODEL: ${OLLAMA_DEFAULT_MODEL:-llama3.2}
+      PREVIEW_ALLOW_REMOTE: ${PREVIEW_ALLOW_REMOTE:-}
+      PREVIEW_READY_TIMEOUT_MS: ${PREVIEW_READY_TIMEOUT_MS:-30000}
     ports:
       - "${APP_PORT:-4000}:4000"
+    volumes:
+      # In the UI, use /workspace/projects/<project-folder>.
+      - ${PROJECTS_DIR:-./projects}:/workspace/projects
+    dns: *dns-servers
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test:
         - CMD
@@ -92,6 +94,7 @@ services:
       - "11434:11434"
     volumes:
       - ollama-data:/root/.ollama
+    dns: *dns-servers
     restart: unless-stopped
 
 volumes:

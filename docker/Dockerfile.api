@@ -1,92 +1,50 @@
+# syntax=docker/dockerfile:1.7
+
 FROM node:22-alpine AS build
 WORKDIR /workspace
 
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
 ARG NO_PROXY
-ARG http_proxy
-ARG https_proxy
-ARG no_proxy
-
 ENV HTTP_PROXY=${HTTP_PROXY} \
     HTTPS_PROXY=${HTTPS_PROXY} \
     NO_PROXY=${NO_PROXY} \
-    http_proxy=${http_proxy} \
-    https_proxy=${https_proxy} \
-    no_proxy=${no_proxy}
+    http_proxy=${HTTP_PROXY} \
+    https_proxy=${HTTPS_PROXY} \
+    no_proxy=${NO_PROXY}
 
 RUN corepack enable
+RUN apk add --no-cache python3 make g++
+
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* turbo.json tsconfig.base.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN pnpm install --no-frozen-lockfile
+
 COPY apps/api apps/api
 COPY packages/shared packages/shared
 RUN pnpm --filter @codeflow/api build
 
 FROM node:22-alpine AS runtime
 WORKDIR /workspace
+ENV NODE_ENV=production
 
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
 ARG NO_PROXY
-ARG http_proxy
-ARG https_proxy
-ARG no_proxy
-ARG OPENCODE_AUTO_INSTALL=true
-ARG OPENCODE_DEFAULT_MODEL=opencode/deepseek-v4-flash-free
-ARG OPENCODE_DEFAULT_SMALL_MODEL=opencode/mimo-v2.5-free
-
-ENV NODE_ENV=production \
-    HTTP_PROXY=${HTTP_PROXY} \
+ENV HTTP_PROXY=${HTTP_PROXY} \
     HTTPS_PROXY=${HTTPS_PROXY} \
     NO_PROXY=${NO_PROXY} \
-    http_proxy=${http_proxy} \
-    https_proxy=${https_proxy} \
-    no_proxy=${no_proxy} \
-    OPENCODE_AUTO_INSTALL=${OPENCODE_AUTO_INSTALL} \
-    OPENCODE_DEFAULT_MODEL=${OPENCODE_DEFAULT_MODEL} \
-    OPENCODE_DEFAULT_SMALL_MODEL=${OPENCODE_DEFAULT_SMALL_MODEL} \
-    OPENCODE_EXECUTABLE=/usr/local/bin/opencode \
-    XDG_CONFIG_HOME=/root/.config \
-    XDG_STATE_HOME=/root/.local/state \
-    XDG_DATA_HOME=/root/.local/share \
-    XDG_CACHE_HOME=/root/.cache
+    http_proxy=${HTTP_PROXY} \
+    https_proxy=${HTTPS_PROXY} \
+    no_proxy=${NO_PROXY}
 
 RUN corepack enable
-
-# Required by node-pty and terminal runtime.
-RUN apk add --no-cache bash git openssh-client
-
-# Preinstall OpenCode in the API image so CodeFlow AI and OpenCode are always bundled together.
-# This avoids requiring manual "npm install -g opencode-ai" after docker compose build.
-# @opencode-ai/plugin is included to avoid runtime plugin installation surprises.
-RUN if [ "$OPENCODE_AUTO_INSTALL" = "true" ]; then \
-      if [ -n "$HTTP_PROXY" ]; then npm config set proxy "$HTTP_PROXY"; fi; \
-      if [ -n "$HTTPS_PROXY" ]; then npm config set https-proxy "$HTTPS_PROXY"; fi; \
-      npm install -g opencode-ai @opencode-ai/plugin; \
-      npm cache clean --force; \
-      opencode --version; \
-    else \
-      echo "Skipping OpenCode install. Set OPENCODE_AUTO_INSTALL=true to include it in the image."; \
-    fi
-
-# Minimal OpenCode configuration bundled with the image.
-# CodeFlow still controls prompts/context; this only gives the CLI safe defaults.
-RUN mkdir -p /root/.config/opencode /root/.local/state/opencode /root/.local/share/opencode /root/.cache/opencode /tmp/codeflow-opencode-context \
- && cat > /workspace/opencode.jsonc <<EOF
-{
-  "\$schema": "https://opencode.ai/config.json",
-  "model": "${OPENCODE_DEFAULT_MODEL}",
-  "small_model": "${OPENCODE_DEFAULT_SMALL_MODEL}",
-  "permission": {
-    "edit": "ask",
-    "bash": "ask"
-  }
-}
-EOF
+RUN apk add --no-cache bash git curl
+RUN npm install -g opencode-ai
 
 COPY --from=build /workspace ./
+RUN mkdir -p /workspace/projects
 
 EXPOSE 4000
 CMD ["pnpm", "--filter", "@codeflow/api", "start:prod"]
