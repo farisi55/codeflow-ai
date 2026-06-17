@@ -20,6 +20,15 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'CodeFlow AI',
   description: 'A web IDE with an AI coding assistant.',
+  icons: {
+    icon: [
+      {
+        url: '/navicon.svg',
+        type: 'image/svg+xml',
+      },
+    ],
+    shortcut: '/navicon.svg',
+  },
 };
 
 interface RootLayoutProps {
